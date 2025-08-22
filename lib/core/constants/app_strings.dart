@@ -9,4 +9,7 @@ class AppStrings {
 
   // collections
   static const userCollection = 'users';
+  static const eventCollection = 'events';
+  static const messageCollection = 'messages';
+  static const pollCollection = 'polls';
 }

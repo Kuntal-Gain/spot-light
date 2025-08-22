@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:spot_time/core/widgets/loading_indicators.dart';
+import 'package:spot_time/feature/event/app/cubit/chat/chat_cubit.dart';
 import 'package:spot_time/feature/event/app/cubit/cred/cred_cubit.dart';
 import 'package:spot_time/feature/event/app/screens/splash_screen.dart';
 import 'di.dart' as di;
 import 'feature/event/app/cubit/auth/auth_cubit.dart';
+import 'feature/event/app/cubit/event/event_cubit.dart';
+import 'feature/event/app/cubit/poll/poll_cubit.dart';
 import 'feature/event/app/screens/home_screen.dart';
 
 void main() async {
@@ -22,19 +25,17 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (context) => di.sl<AuthCubit>()..appStarted(),
-        ),
-        BlocProvider(
-          create: (context) => di.sl<CredCubit>(),
-        ),
+        BlocProvider(create: (_) => di.sl<AuthCubit>()..appStarted()),
+        BlocProvider(create: (_) => di.sl<CredCubit>()),
+        BlocProvider(create: (_) => di.sl<EventCubit>()),
+        BlocProvider(create: (_) => di.sl<ChatCubit>()),
+        BlocProvider(create: (_) => di.sl<PollCubit>()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Spot Time',
         home: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, state) {
-            print(state);
             if (state is Authenticated) {
               return const HomeScreen();
             } else if (state is NotAuthenticated) {

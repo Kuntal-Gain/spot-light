@@ -22,6 +22,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   bloc: ^9.0.0
   google_fonts: ^6.3.0
+  delightful_toast: ^1.1.0
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ class AppwriteClient {
   late final Client client;
   late final Account account;
   late final Databases database;
+  late final Realtime realtime;
 
   AppwriteClient() {
     client = Client()
@@ -14,5 +15,6 @@ class AppwriteClient {
 
     account = Account(client);
     database = Databases(client);
+    realtime = Realtime(client);
   }
 }
