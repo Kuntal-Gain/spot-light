@@ -2,20 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:spot_time/core/constants/app_color.dart';
 import 'package:spot_time/core/utils/text_style.dart';
+import 'package:spot_time/feature/event/app/cubit/event/event_cubit.dart';
 import 'package:spot_time/feature/event/app/widgets/event_card.dart';
+import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
 
 import '../../../../core/usecase/usecase.dart';
 import '../../domain/entities/event_entity.dart';
 import '../cubit/cred/cred_cubit.dart';
+import 'add_event_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final UserEntity user;
+  const HomeScreen({super.key, required this.user});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<EventCubit>().getEvents();
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
@@ -45,25 +55,38 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            Expanded(
-                child: ListView.builder(
-              itemCount: 10,
-              itemBuilder: (context, index) {
-                return eventCard(
-                    event: EventEntity(
-                      id: '123',
-                      name: 'Feast',
-                      type: 'feast',
-                      participants: ['user-1', 'user-2'],
-                      createdAt: DateTime.now(),
-                      createdBy: 'user-1',
-                      messageId: '123',
-                      description: 'description',
-                      coverImage: '',
-                    ),
-                    ctx: context);
+            BlocBuilder<EventCubit, EventState>(
+              builder: (context, state) {
+                print(state);
+                if (state is EventLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+                if (state is EventError) {
+                  return Center(
+                    child: Text(state.message),
+                  );
+                }
+                if (state is EventsLoaded) {
+                  final events = state.events;
+
+                  return Expanded(
+                      child: ListView.builder(
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      final event = events[index];
+
+                      return eventCard(
+                        event: event,
+                        ctx: context,
+                      );
+                    },
+                  ));
+                }
+                return const SizedBox();
               },
-            ))
+            )
           ],
         ),
         floatingActionButton: Container(
@@ -81,7 +104,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          child: const Icon(Icons.add, color: AppColors.secondary),
+          child: IconButton(
+            icon: const Icon(Icons.add, color: AppColors.secondary),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddEventScreen(user: widget.user),
+                ),
+              );
+            },
+          ),
         ));
   }
 }

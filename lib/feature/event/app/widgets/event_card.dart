@@ -66,7 +66,8 @@ Widget eventCard({required EventEntity event, required BuildContext ctx}) {
                       ),
                       eventWidget(
                           type: eventTypeItems
-                              .firstWhere((e) => e.type == event.type)),
+                              .firstWhere((e) => e.type == event.type),
+                          size: Size(mq.width * 0.25, mq.height * 0.03)),
                     ],
                   ),
                   Text('user-2 is Added',
@@ -102,10 +103,11 @@ final eventTypeItems = [
   EventTypeItem(type: 'other', color: Colors.purple),
 ];
 
-Widget eventWidget({required EventTypeItem type}) {
+Widget eventWidget({required EventTypeItem type, required Size size}) {
   return Container(
-    height: 20,
-    width: 80,
+    height: size.height,
+    width: size.width,
+    padding: const EdgeInsets.symmetric(horizontal: 5),
     decoration: BoxDecoration(
       color: type.color,
       borderRadius: BorderRadius.circular(15),
@@ -114,7 +116,7 @@ Widget eventWidget({required EventTypeItem type}) {
       child: Text(
         type.type,
         style: headingStyle(
-          color: AppColors.secondary,
+          color: AppColors.primary,
           size: 12,
         ),
       ),

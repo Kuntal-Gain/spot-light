@@ -33,17 +33,11 @@ class _AuthScreenState extends State<AuthScreen> {
   void signup() {
     // TODO: code here
 
-    context
-        .read<CredCubit>()
-        .register(
+    context.read<CredCubit>().register(
           name: nameController.text,
           email: emailController.text,
           password: passwordController.text,
-        )
-        .then((_) => {
-              Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const HomeScreen()))
-            });
+        );
   }
 
   void login() {
@@ -76,8 +70,8 @@ class _AuthScreenState extends State<AuthScreen> {
         if (state is CredSuccess) {
           successBar(context, "Logged in as ${state.user.name}");
 
-          Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const HomeScreen()));
+          Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => HomeScreen(user: state.user)));
         }
       },
       child: Scaffold(

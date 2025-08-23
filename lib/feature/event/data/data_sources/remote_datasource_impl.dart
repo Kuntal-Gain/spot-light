@@ -159,7 +159,7 @@ class RemoteDataSourceImpl implements RemoteDataSource {
     final createdEvent = await database.createDocument(
       databaseId: AppStrings.databaseId,
       collectionId: AppStrings.eventCollection,
-      documentId: event.id,
+      documentId: ID.unique(),
       data: newEvent,
     );
   }
