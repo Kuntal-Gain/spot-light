@@ -68,8 +68,11 @@ class _AuthScreenState extends State<AuthScreen> {
           errorBar(context, state.message);
         }
         if (state is CredSuccess) {
-          successBar(context, "Logged in as ${state.user.name}");
+          successBar(context, "Logged in");
 
+          context.read<CredCubit>().loadCurrentUser();
+        }
+        if (state is UserLoaded) {
           Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => HomeScreen(user: state.user)));
         }

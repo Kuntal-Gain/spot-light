@@ -1,318 +1,306 @@
 // lib/features/auth/data/datasources/remote_datasource_impl.dart
-import 'package:appwrite/appwrite.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:spot_time/core/errors/failures.dart';
 import 'package:spot_time/feature/event/data/models/event_model.dart';
 import 'package:spot_time/feature/event/data/models/poll_model.dart';
 import 'package:spot_time/feature/event/domain/entities/chat_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/poll_entity.dart';
+import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/network/logger.dart';
+import '../../../../core/utils/generators.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
 import 'remote_datasource.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class RemoteDataSourceImpl implements RemoteDataSource {
-  final Account account;
-  final Databases database;
-  final Realtime realtime;
-  final FlutterSecureStorage storage;
+  final FirebaseFirestore firestore;
+  final FirebaseAuth auth;
+  final FirebaseDatabase db;
 
   RemoteDataSourceImpl({
-    required this.account,
-    required this.database,
-    required this.realtime,
-    required this.storage,
+    required this.firestore,
+    required this.auth,
+    required this.db,
   });
 
+  // ---------------- AUTH ----------------
   @override
-  Future<UserModel> loginWithEmail({
-    required String email,
-    required String password,
-  }) async {
+  Future<String> getCurrentUid() async => auth.currentUser!.uid;
+
+  @override
+  Future<UserEntity> getCurrentUser() async => UserModel.fromMap(
+      (await firestore.collection('users').doc(auth.currentUser!.uid).get())
+          .data()!);
+
+  @override
+  Future<bool> isUserLoggedIn() async => auth.currentUser!.uid != null;
+
+  @override
+  Future<void> loginWithEmail(
+      {required String email, required String password}) async {
     try {
-      // * Directly create a new session
-      final session = await account.createEmailPasswordSession(
-        email: email,
-        password: password,
-      );
-
-      final doc = await database.getDocument(
-        databaseId: AppStrings.databaseId,
-        collectionId: AppStrings.userCollection,
-        documentId: session.userId,
-      );
-
-      await storage.write(key: AppStrings.sessionId, value: session.$id);
-
-      return UserModel.fromMap(doc.data);
-    } on AppwriteException catch (e) {
-      if (e.code == 401 && e.type == 'user_session_already_exists') {
-        throw Exception("Session Already Exists");
-      } else if (e.code == 401) {
-        throw Exception("Invalid email or password");
-      } else {
-        throw Exception(e.message ?? "Something went wrong, please try again");
+      if (email.isEmpty || password.isEmpty) {
+        throw ServerFailure('Email and password are required');
       }
+
+      await auth.signInWithEmailAndPassword(email: email, password: password);
+      printLog("info", "User logged in successfully");
+    } on FirebaseAuthException catch (e) {
+      printLog("err", e.message!);
+      throw ServerFailure(e.message!);
     } catch (e) {
-      // ! fallback
-      rethrow;
-    }
-  }
-
-  @override
-  Future<UserModel> registerWithEmail({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    try {
-      final userAcc = await account.create(
-        userId: ID.unique(),
-        email: email,
-        password: password,
-        name: name,
-      );
-
-      final session = await account.createEmailPasswordSession(
-        email: email,
-        password: password,
-      );
-
-      await storage.write(key: AppStrings.sessionId, value: session.$id);
-
-      final user = UserModel(
-        id: userAcc.$id,
-        name: name,
-        email: email,
-        avatar:
-            'https://static.vecteezy.com/system/resources/previews/004/607/791/non_2x/man-face-emotive-icon-smiling-male-character-in-blue-shirt-flat-illustration-isolated-on-white-happy-human-psychological-portrait-positive-emotions-user-avatar-for-app-web-design-vector.jpg',
-        events: const [],
-        createdAt: userAcc.$createdAt,
-      ).toMap();
-
-      await database.createDocument(
-        databaseId: AppStrings.databaseId,
-        collectionId: AppStrings.userCollection,
-        documentId: userAcc.$id,
-        data: user,
-      );
-
-      return UserModel.fromMap(user);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  @override
-  Future<UserModel> getCurrentUser() async {
-    try {
-      final user = await account.get();
-
-      final doc = await database.getDocument(
-        databaseId: AppStrings.databaseId,
-        collectionId: AppStrings.userCollection,
-        documentId: user.$id,
-      );
-
-      return UserModel.fromMap(doc.data);
-    } catch (e) {
-      rethrow;
+      printLog("err", e.toString());
+      throw ServerFailure(e.toString());
     }
   }
 
   @override
   Future<void> logout() async {
     try {
-      final sessionId = await storage.read(key: AppStrings.sessionId);
-
-      if (sessionId != null) {
-        await account.deleteSession(sessionId: sessionId);
-        await storage.delete(key: AppStrings.sessionId);
-      } else {
-        await account.deleteSession(sessionId: 'current');
-      }
+      await auth.signOut();
+      printLog("info", "User logged out successfully");
     } catch (e) {
-      rethrow;
+      printLog("err", e.toString());
+      throw ServerFailure(e.toString());
     }
   }
 
   @override
-  Future<bool> isUserLoggedIn() async {
-    final sessionId = await storage.read(key: AppStrings.sessionId);
-    return sessionId != null;
+  Future<void> registerWithEmail(
+      {required String email, required String password}) async {
+    try {
+      if (email.isEmpty || password.isEmpty) {
+        throw ServerFailure('Email and password are required');
+      }
+
+      await auth
+          .createUserWithEmailAndPassword(email: email, password: password)
+          .then((value) {
+        if (value.user?.uid != null) {
+          createUser(
+            user: UserEntity(
+              uid: value.user!.uid,
+              name: '',
+              email: email,
+              avatar: '',
+              events: const [],
+              createdAt: Timestamp.now(),
+            ),
+          );
+          printLog("info", "User registered successfully");
+        }
+      }).catchError((e) {
+        printLog("err", e.toString());
+        throw ServerFailure(e.toString());
+      });
+    } on FirebaseAuthException catch (e) {
+      printLog("err", e.message!);
+      throw ServerFailure(e.message!);
+    } catch (e) {
+      printLog("err", e.toString());
+      throw ServerFailure(e.toString());
+    }
   }
 
-  // * events
+  @override
+  Future<void> createUser({required UserEntity user}) async {
+    final userCollection = firestore.collection(AppStrings.userCollection);
+
+    final uid = await getCurrentUid();
+
+    await userCollection.doc(uid).get().then((doc) {
+      final newUser = UserModel(
+        uid: uid,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        events: user.events,
+        createdAt: Timestamp.now(),
+      ).toMap();
+
+      if (!doc.exists) {
+        userCollection.doc(uid).set(newUser);
+      } else {
+        userCollection.doc(uid).update(newUser);
+      }
+    }).catchError((e) {
+      printLog("err", e.toString());
+      throw ServerFailure(e.toString());
+    });
+  }
+
+  // ---------------- EVENTS ----------------
+
   @override
   Future<void> addEvent(EventEntity event) async {
-    final newEvent = EventModel(
-      id: event.id,
-      name: event.name,
-      type: event.type,
-      participants: event.participants,
-      createdBy: event.createdBy,
-      messageId: event.messageId,
-      createdAt: event.createdAt,
-    ).toMap();
+    final eventCollection = firestore.collection(AppStrings.eventCollection);
 
-    final createdEvent = await database.createDocument(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.eventCollection,
-      documentId: ID.unique(),
-      data: newEvent,
-    );
+    try {
+      final uid = await getCurrentUid();
+
+      // Create a new empty doc → Firestore generates a unique ID
+      final docRef = eventCollection.doc();
+
+      // Generate a unique messageId for RTDB
+      final msgId = generateMessageId();
+
+      final newEvent = EventModel(
+        eventId: docRef.id, // Firestore generated ID
+        name: event.name,
+        type: event.type,
+        participants: [uid],
+        createdBy: uid,
+        messageId: msgId,
+        description: event.description,
+        createdAt: event.createdAt,
+        lastMessage: 'Start Discussion',
+      ).toMap();
+
+      // Save the event in Firestore
+      await docRef.set(newEvent);
+
+      // 🔥 Create the root node for messages in RTDB
+      final dbRef = db.ref().child('events').child(msgId);
+      await dbRef.set({
+        'messages': {}, // initialize empty messages node
+        'createdBy': uid,
+        'createdAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      printLog("err", e.toString());
+      throw ServerFailure(e.toString());
+    }
   }
 
   @override
-  Future<List<EventEntity>> getEvents() async {
-    final events = await database.listDocuments(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.eventCollection,
-    );
+  Future<List<EventEntity>> getEvents() {
+    final eventCollection = firestore.collection(AppStrings.eventCollection);
 
-    return events.documents.map((e) => EventModel.fromMap(e.data)).toList();
+    return eventCollection.get().then((querySnapshot) {
+      return querySnapshot.docs.map((doc) {
+        return EventModel.fromSnapshot(doc);
+      }).toList();
+    });
   }
 
   @override
-  Future<EventEntity> getSingleEvent(String eventId) async {
-    final event = await database.getDocument(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.eventCollection,
-      documentId: eventId,
-    );
+  Future<EventEntity> getSingleEvent(String eventId) {
+    final eventCollection = firestore.collection(AppStrings.eventCollection);
 
-    return EventModel.fromMap(event.data);
+    return eventCollection.doc(eventId).get().then((doc) {
+      return EventModel.fromSnapshot(doc);
+    });
   }
 
-  // * message module
+  // ---------------- CHAT ----------------
 
   @override
   Future<void> sendMessage(MessageEntity message, String eventId) async {
-    final messageModel = MessageModel(
-      id: message.id,
-      senderId: message.senderId,
-      content: message.content,
-      mediaUrl: message.mediaUrl,
-      pollId: message.pollId,
-      type: message.type,
-      createdAt: message.createdAt,
-    );
+    try {
+      // Realtime DB ref
+      final dbRef = db
+          .ref()
+          .child('events')
+          .child(eventId)
+          .child('messages')
+          .push(); // push() auto-generates unique msg id
 
-    final createdDoc = await database.createDocument(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.messageCollection,
-      documentId: 'unique()',
-      data: {
-        ...messageModel.toMap(),
-        'eventId': eventId, // link message with event
-      },
-    );
+      final msgData = MessageModel(
+        id: dbRef.key!,
+        senderId: message.senderId,
+        content: message.content,
+        type: message.type,
+        createdAt: message.createdAt,
+      ).toMap();
+
+      // Save message in Realtime Database
+      await dbRef.set(msgData);
+
+      // Update Firestore with last message
+      final chatRef =
+          firestore.collection(AppStrings.eventCollection).doc(eventId);
+      await chatRef.update({
+        'lastMessage': message.content,
+      });
+    } catch (e) {
+      printLog("err", "Error sending message: $e");
+      throw ServerFailure(e.toString());
+    }
   }
 
   @override
-  Stream<List<MessageEntity>> subscribeMessages(String eventId) async* {
-    final messagesCollection = database.listDocuments(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.messageCollection,
-      queries: [
-        Query.equal('eventId', eventId),
-        Query.orderDesc('\$createdAt'),
-      ],
-    );
+  Stream<List<MessageEntity>> subscribeMessages(String messageId) {
+    final dbRef = db.ref().child('events').child(messageId).child('messages');
+    final chatRef =
+        firestore.collection(AppStrings.eventCollection).doc(messageId);
 
-    // Step 1: Yield initial messages (history)
-    final snapshot = await messagesCollection;
-    yield snapshot.documents
-        .map((doc) => MessageModel.fromMap(doc.data))
-        .toList();
-
-    // Step 2: Listen for realtime updates
-    yield* realtime
-        .subscribe([
-          'databases.${AppStrings.databaseId}.collections.${AppStrings.messageCollection}.documents'
-        ])
-        .stream
-        .where((event) =>
-            event.payload['eventId'] != null &&
-            event.payload['eventId'] == eventId)
-        .asyncMap((event) async {
-          // Refetch the full updated list whenever something changes
-          final updatedSnapshot = await database.listDocuments(
-            databaseId: AppStrings.databaseId,
-            collectionId: AppStrings.messageCollection,
-            queries: [
-              Query.equal('eventId', eventId),
-              Query.orderDesc('\$createdAt'),
-            ],
-          );
-
-          return updatedSnapshot.documents
-              .map((doc) => MessageModel.fromMap(doc.data))
-              .toList();
-        });
-  }
-
-  // * poll module
-
-  @override
-  Future<void> createPoll(PollEntity poll) async {
-    final newPoll = PollModel(
-      id: poll.id,
-      eventId: poll.eventId,
-      createdBy: poll.createdBy,
-      question: poll.question,
-      options: poll.options,
-      createdAt: poll.createdAt,
-    ).toMap();
-
-    await database.createDocument(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.pollCollection,
-      documentId: 'unique()',
-      data: newPoll,
-    );
-  }
-
-  @override
-  Future<void> votePoll({
-    required String pollId,
-    required String optionId, // better pass optionId, not text
-  }) async {
-    final pollDoc = await database.getDocument(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.pollCollection,
-      documentId: pollId,
-    );
-
-    // Convert document data to PollModel
-    final poll = PollModel.fromMap(pollDoc.data);
-
-    // Get current userId
-    final user = await account.get();
-    final userId = user.$id;
-
-    // Find the option and add vote
-    final updatedOptions = poll.options.map((opt) {
-      if (opt.id == optionId) {
-        final votes = List<String>.from(opt.votes);
-        if (!votes.contains(userId)) {
-          votes.add(userId);
+    return dbRef.onValue.asyncMap((event) async {
+      try {
+        // If no messages exist yet
+        if (event.snapshot.value == null) {
+          return <MessageEntity>[];
         }
-        return PollOptionModel(id: opt.id, text: opt.text, votes: votes);
-      }
-      return opt;
-    }).toList();
 
-    // Update document in Appwrite
-    await database.updateDocument(
-      databaseId: AppStrings.databaseId,
-      collectionId: AppStrings.pollCollection,
-      documentId: pollId,
-      data: {
-        'options':
-            updatedOptions.map((o) => (o as PollOptionModel).toMap()).toList(),
-      },
-    );
+        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+        final List<MessageModel> messages = [];
+
+        for (var entry in data.entries) {
+          try {
+            final msgMap = Map<String, dynamic>.from(entry.value);
+
+            final message = MessageModel(
+              id: entry.key,
+              senderId: msgMap['senderId'] ?? "",
+              content: msgMap['content'] ?? "",
+              type: msgMap['type'] ?? "text",
+              createdAt:
+                  msgMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+            );
+
+            messages.add(message);
+          } catch (e) {
+            printLog("warn", "Skipping corrupted message: $e");
+          }
+        }
+
+        // Sort messages by createdAt
+        messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+        // Update last message in Firestore (safe check)
+        if (messages.isNotEmpty) {
+          final lastMessage = messages.last;
+          await chatRef
+              .update({'lastMessage': lastMessage.content}).catchError((e) {
+            printLog("warn", "Failed to update lastMessage: $e");
+          });
+        }
+
+        return messages;
+      } catch (e) {
+        printLog("err", "Error in subscribeMessages: $e");
+        return <MessageEntity>[];
+      }
+    });
+  }
+
+  // ---------------- POLL ----------------
+
+  @override
+  Future<void> createPoll(PollEntity poll) {
+    // TODO: implement createPoll
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> votePoll({required String pollId, required String optionId}) {
+    // TODO: implement votePoll
+    throw UnimplementedError();
   }
 }

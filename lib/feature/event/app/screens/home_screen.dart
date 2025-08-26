@@ -7,6 +7,7 @@ import 'package:spot_time/feature/event/app/widgets/event_card.dart';
 import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
 
 import '../../../../core/usecase/usecase.dart';
+import '../../../../core/widgets/loading_indicators.dart';
 import '../../domain/entities/event_entity.dart';
 import '../cubit/cred/cred_cubit.dart';
 import 'add_event_screen.dart';
@@ -59,9 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context, state) {
                 print(state);
                 if (state is EventLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const LoadingIndicator();
                 }
                 if (state is EventError) {
                   return Center(

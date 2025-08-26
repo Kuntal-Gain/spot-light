@@ -6,6 +6,7 @@ import 'package:spot_time/feature/event/domain/usecases/auth/login_with_email.da
 import 'package:spot_time/feature/event/domain/usecases/auth/register_with_email.dart';
 
 import '../../../../../core/usecase/usecase.dart';
+import '../../../domain/usecases/auth/get_current_uid_usecase.dart';
 import '../../../domain/usecases/auth/logout_user.dart';
 
 part 'cred_state.dart';
@@ -14,12 +15,14 @@ class CredCubit extends Cubit<CredState> {
   final GetCurrentUser getCurrentUser;
   final LoginWithEmail loginWithEmail;
   final RegisterWithEmail registerWithEmail;
+  final GetCurrentUid getCurrentUid;
   final LogoutUser logout;
 
   CredCubit({
     required this.getCurrentUser,
     required this.loginWithEmail,
     required this.registerWithEmail,
+    required this.getCurrentUid,
     required this.logout,
   }) : super(CredInitial());
 
@@ -34,7 +37,14 @@ class CredCubit extends Cubit<CredState> {
 
       result.fold(
         (failure) => emit(CredError(message: failure.message)),
-        (user) => emit(CredSuccess(user: user)),
+        (_) async {
+          final uidResult = await getCurrentUid.call(NoParams());
+
+          uidResult.fold(
+            (failure) => emit(CredError(message: failure.message)),
+            (uid) => emit(CredSuccess(uid: uid)),
+          );
+        },
       );
     } catch (e) {
       emit(CredError(message: e.toString()));
@@ -51,12 +61,19 @@ class CredCubit extends Cubit<CredState> {
 
     try {
       final result = await registerWithEmail.call(
-        RegisterParams(name: name, email: email, password: password),
+        RegisterParams(email: email, password: password),
       );
 
       result.fold(
         (failure) => emit(CredError(message: failure.message)),
-        (user) => emit(CredSuccess(user: user)),
+        (_) async {
+          final uidResult = await getCurrentUid.call(NoParams());
+
+          uidResult.fold(
+            (failure) => emit(CredError(message: failure.message)),
+            (uid) => emit(CredSuccess(uid: uid)),
+          );
+        },
       );
     } catch (e) {
       emit(CredError(message: e.toString()));
@@ -73,7 +90,7 @@ class CredCubit extends Cubit<CredState> {
 
       result.fold(
         (failure) => emit(CredError(message: failure.message)),
-        (user) => emit(CredSuccess(user: user!)),
+        (user) => emit(UserLoaded(user: user!)),
       );
     } catch (e) {
       emit(CredError(message: e.toString()));

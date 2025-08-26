@@ -1,11 +1,11 @@
 class MessageEntity {
   final String id;
   final String senderId;
-  final String content; // could be text / file url
+  final String content; // can be text / url / poll question
   final String? mediaUrl;
   final String? pollId;
   final String type; // "text", "image", "video", "poll"
-  final DateTime createdAt;
+  final int createdAt; // store as millisecondsSinceEpoch from RTDB
 
   MessageEntity({
     required this.id,

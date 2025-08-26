@@ -15,11 +15,11 @@ class CredLoading extends CredState {
 }
 
 class CredSuccess extends CredState {
-  final UserEntity user;
-  const CredSuccess({required this.user});
+  final String uid;
+  const CredSuccess({required this.uid});
 
   @override
-  List<Object> get props => [user];
+  List<Object> get props => [uid];
 }
 
 class CredError extends CredState {
@@ -28,4 +28,12 @@ class CredError extends CredState {
 
   @override
   List<Object> get props => [message];
+}
+
+class UserLoaded extends CredState {
+  final UserEntity user;
+  const UserLoaded({required this.user});
+
+  @override
+  List<Object> get props => [user];
 }

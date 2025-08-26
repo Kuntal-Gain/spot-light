@@ -2,11 +2,11 @@
 import '../../../../../core/usecase/usecase.dart';
 import '../../../../../core/errors/failures.dart';
 import '../../entities/user_entity.dart';
-import '../../repo/appwrite_repository.dart';
+import '../../repo/firebase_repository.dart';
 import 'package:dartz/dartz.dart';
 
 class GetCurrentUser implements UseCase<UserEntity?, NoParams> {
-  final AppwriteRepository repository;
+  final FirebaseRepository repository;
 
   GetCurrentUser(this.repository);
 

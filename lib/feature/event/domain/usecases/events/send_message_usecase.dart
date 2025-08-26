@@ -1,11 +1,11 @@
 import '../../../../../core/usecase/usecase.dart';
 import '../../../../../core/errors/failures.dart';
 import '../../entities/chat_entity.dart';
-import '../../repo/appwrite_repository.dart';
+import '../../repo/firebase_repository.dart';
 import 'package:dartz/dartz.dart';
 
 class SendMessage implements UseCase<Unit, SendMessageParams> {
-  final AppwriteRepository repository;
+  final FirebaseRepository repository;
   SendMessage(this.repository);
 
   @override

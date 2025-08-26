@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:spot_time/core/constants/app_color.dart';
@@ -7,6 +10,7 @@ import 'package:spot_time/feature/event/app/cubit/event/event_cubit.dart';
 import 'package:spot_time/feature/event/app/widgets/event_card.dart';
 import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
 
+import '../../../../core/utils/generators.dart';
 import '../../../../core/utils/text_style.dart';
 import '../../../../core/utils/validators.dart';
 import '../../domain/entities/event_entity.dart';
@@ -29,14 +33,14 @@ class _AddEventScreenState extends State<AddEventScreen> {
     if (formKey.currentState!.validate()) {
       context.read<EventCubit>().createEvent(
             event: EventEntity(
-              id: '',
+              eventId: '',
               name: nameController.text,
               description: descriptionController.text,
               type: eventTypeItems[selectedType].type,
-              participants: [widget.user.id],
-              createdAt: DateTime.now(),
-              createdBy: widget.user.id,
-              messageId: '',
+              participants: [widget.user.uid],
+              createdAt: Timestamp.now(),
+              createdBy: widget.user.uid,
+              messageId: generateMessageId(),
               coverImage: '',
             ),
           );

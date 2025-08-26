@@ -7,13 +7,15 @@ import '../../domain/entities/chat_entity.dart';
 import '../../domain/entities/event_entity.dart';
 
 abstract class RemoteDataSource {
-  Future<UserEntity> loginWithEmail(
+  Future<void> loginWithEmail(
       {required String email, required String password});
-  Future<UserEntity> registerWithEmail(
-      {required String name, required String email, required String password});
+  Future<void> registerWithEmail(
+      {required String email, required String password});
   Future<UserEntity> getCurrentUser();
+  Future<String> getCurrentUid();
   Future<void> logout();
   Future<bool> isUserLoggedIn();
+  Future<void> createUser({required UserEntity user});
 
   // * events
   Future<void> addEvent(EventEntity event);

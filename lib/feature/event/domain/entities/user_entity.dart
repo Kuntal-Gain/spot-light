@@ -1,16 +1,17 @@
 // lib/features/auth/domain/entities/user_entity.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
 class UserEntity extends Equatable {
-  final String id;
+  final String uid;
   final String name;
   final String email;
   final String avatar;
   final List<String> events;
-  final String createdAt;
+  final Timestamp createdAt;
 
   const UserEntity({
-    required this.id,
+    required this.uid,
     required this.name,
     required this.email,
     required this.avatar,
@@ -19,5 +20,5 @@ class UserEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props => [id, name, email, avatar, events, createdAt];
+  List<Object?> get props => [uid, name, email, avatar, events, createdAt];
 }

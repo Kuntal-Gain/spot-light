@@ -4,43 +4,40 @@ import 'package:spot_time/core/errors/failures.dart';
 import 'package:spot_time/feature/event/domain/entities/chat_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/poll_entity.dart';
-import 'package:spot_time/feature/event/domain/repo/appwrite_repository.dart';
+import 'package:spot_time/feature/event/domain/repo/firebase_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../data_sources/remote_datasource.dart';
 
-class AppwriteRepositoryImpl implements AppwriteRepository {
+class FirebaseRepositoryImpl implements FirebaseRepository {
   final RemoteDataSource remoteDataSource;
 
-  AppwriteRepositoryImpl({required this.remoteDataSource});
+  FirebaseRepositoryImpl({required this.remoteDataSource});
 
   // ---------------- AUTH ----------------
   @override
-  Future<Either<Failure, UserEntity>> loginWithEmail({
+  Future<Either<Failure, void>> loginWithEmail({
     required String email,
     required String password,
   }) async {
     try {
-      final user = await remoteDataSource.loginWithEmail(
-          email: email, password: password);
-      return Right(user);
+      await remoteDataSource.loginWithEmail(email: email, password: password);
+      return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
   }
 
   @override
-  Future<Either<Failure, UserEntity>> registerWithEmail({
-    required String name,
+  Future<Either<Failure, void>> registerWithEmail({
     required String email,
     required String password,
   }) async {
     try {
-      final user = await remoteDataSource.registerWithEmail(
-        name: name,
+      await remoteDataSource.registerWithEmail(
         email: email,
         password: password,
       );
-      return Right(user);
+      return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -71,6 +68,16 @@ class AppwriteRepositoryImpl implements AppwriteRepository {
     try {
       final isLoggedIn = await remoteDataSource.isUserLoggedIn();
       return Right(isLoggedIn);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> getCurrentUid() async {
+    try {
+      final uid = await remoteDataSource.getCurrentUid();
+      return Right(uid);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -153,6 +160,16 @@ class AppwriteRepositoryImpl implements AppwriteRepository {
     try {
       await remoteDataSource.votePoll(pollId: pollId, optionId: optionId);
       return const Right(unit);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> createUser({required UserEntity user}) async {
+    try {
+      await remoteDataSource.createUser(user: user);
+      return const Right(null);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

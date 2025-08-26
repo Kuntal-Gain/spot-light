@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../domain/entities/event_entity.dart';
 
 class EventModel extends EventEntity {
   const EventModel({
-    required super.id,
+    required super.eventId,
     required super.name,
     required super.type,
     required super.participants,
@@ -11,24 +13,29 @@ class EventModel extends EventEntity {
     required super.createdAt,
     super.description,
     super.coverImage,
+    super.lastMessage,
   });
 
-  factory EventModel.fromMap(Map<String, dynamic> map) {
+  factory EventModel.fromSnapshot(DocumentSnapshot snap) {
+    var ss = snap.data() as Map<String, dynamic>;
+
     return EventModel(
-      id: map['\$id'],
-      name: map['name'],
-      type: map['type'],
-      participants: List<String>.from(map['participants'] ?? []),
-      createdBy: map['createdBy'],
-      createdAt: DateTime.parse(map['\$createdAt']),
-      description: map['description'],
-      messageId: map['messageId'],
-      coverImage: map['coverImage'],
+      eventId: ss['eventId'],
+      name: ss['name'] ?? '',
+      type: ss['type'] ?? '',
+      participants: List<String>.from(ss['participants'] ?? []),
+      createdBy: ss['createdBy'] ?? '',
+      createdAt: ss['createdAt'] as Timestamp,
+      description: ss['description'],
+      messageId: ss['messageId'] ?? '',
+      coverImage: ss['coverImage'] ?? '',
+      lastMessage: ss['lastMessage'] ?? '',
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'eventId': eventId,
       'name': name,
       'type': type,
       'participants': participants,
@@ -36,6 +43,8 @@ class EventModel extends EventEntity {
       'messageId': messageId,
       'description': description,
       'coverImage': coverImage,
+      'createdAt': createdAt,
+      'lastMessage': lastMessage,
     };
   }
 }

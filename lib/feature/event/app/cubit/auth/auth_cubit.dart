@@ -41,4 +41,19 @@ class AuthCubit extends Cubit<AuthState> {
       emit(NotAuthenticated(message: e.toString()));
     }
   }
+
+  Future<void> loadUser() async {
+    emit(AuthLoading());
+
+    try {
+      final result = await getCurrentUser.call(NoParams());
+
+      result.fold(
+        (failure) => emit(NotAuthenticated(message: failure.message)),
+        (user) => emit(Authenticated(user: user!)),
+      );
+    } catch (e) {
+      emit(NotAuthenticated(message: e.toString()));
+    }
+  }
 }

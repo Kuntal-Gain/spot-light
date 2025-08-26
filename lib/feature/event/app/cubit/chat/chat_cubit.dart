@@ -12,49 +12,59 @@ class ChatCubit extends Cubit<ChatState> {
   final FetchMessagesUsecase fetchMessagesUsecase;
   final SendMessage sendMessageUsecase;
 
-  StreamSubscription? _messagesSub;
-
   ChatCubit({
     required this.fetchMessagesUsecase,
     required this.sendMessageUsecase,
   }) : super(ChatInitial());
 
-  Future<void> sendMessage({
-    required MessageEntity message,
-    required String eventId,
-  }) async {
-    try {
-      await sendMessageUsecase.call(
-        SendMessageParams(message: message, eventId: eventId),
-      );
+  void fetchMessages({required String messageId}) async {
+    if (isClosed) return;
 
-      if (state is ChatLoaded) {
-        final updatedMessages =
-            List<MessageEntity>.from((state as ChatLoaded).messages)
-              ..insert(0, message);
-        emit(ChatLoaded(updatedMessages));
-      }
+    try {
+      emit(ChatLoading());
+
+      final result = fetchMessagesUsecase.call(messageId);
+
+      result.listen((either) {
+        either.fold(
+          (failure) => emit(ChatError(failure.toString())),
+          (messages) => emit(ChatLoaded(messages)),
+        );
+      }).onError((error) {
+        emit(ChatError(error.toString()));
+      });
     } catch (e) {
       emit(ChatError(e.toString()));
     }
   }
 
-  void subscribeToMessages(String eventId) {
-    emit(ChatLoading());
+  Future<void> sendMessage({
+    required MessageEntity message,
+    required String messageId,
+  }) async {
+    try {
+      // Optimistic update (instant UI update before backend confirms)
+      if (state is ChatLoaded) {
+        final currentMessages =
+            List<MessageEntity>.from((state as ChatLoaded).messages);
+        emit(ChatLoaded([...currentMessages, message]));
+      }
 
-    _messagesSub?.cancel(); // cleanup old subscription
-
-    _messagesSub = fetchMessagesUsecase.call(eventId).listen((res) {
-      res.fold(
-        (failure) => emit(ChatError(failure.toString())),
-        (messages) => emit(ChatLoaded(messages)),
+      final result = await sendMessageUsecase.call(
+        SendMessageParams(eventId: messageId, message: message),
       );
-    });
-  }
 
-  @override
-  Future<void> close() {
-    _messagesSub?.cancel(); // prevent leaks
-    return super.close();
+      result.fold(
+        (failure) {
+          emit(ChatError(failure.toString()));
+        },
+        (_) {
+          // Do nothing: the subscription will update messages in real-time
+          // If you want, you can keep the optimistic update and skip emitting here
+        },
+      );
+    } catch (e) {
+      emit(ChatError(e.toString()));
+    }
   }
 }

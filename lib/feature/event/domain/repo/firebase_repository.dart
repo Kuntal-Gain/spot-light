@@ -7,18 +7,21 @@ import '../entities/user_entity.dart';
 import '../../../../core/errors/failures.dart';
 import 'package:dartz/dartz.dart';
 
-abstract class AppwriteRepository {
+abstract class FirebaseRepository {
   // * credentials
-  Future<Either<Failure, UserEntity>> loginWithEmail({
+  Future<Either<Failure, void>> loginWithEmail({
     required String email,
     required String password,
   });
-  Future<Either<Failure, UserEntity>> registerWithEmail({
-    required String name,
+  Future<Either<Failure, void>> registerWithEmail({
     required String email,
     required String password,
+  });
+  Future<Either<Failure, void>> createUser({
+    required UserEntity user,
   });
   Future<Either<Failure, UserEntity?>> getCurrentUser();
+  Future<Either<Failure, String>> getCurrentUid();
   Future<Either<Failure, void>> logout();
   Future<Either<Failure, bool>> isUserLoggedIn();
 
@@ -27,6 +30,8 @@ abstract class AppwriteRepository {
   Future<Either<Failure, void>> addEvent(EventEntity event);
   Future<Either<Failure, List<EventEntity>>> getEvents();
   Future<Either<Failure, EventEntity>> getSingleEvent(String eventId);
+
+  // * chat
   Future<Either<Failure, Unit>> sendMessage({
     required String eventId,
     required MessageEntity message,
@@ -36,6 +41,8 @@ abstract class AppwriteRepository {
   Future<Either<Failure, Unit>> createNewPoll({
     required PollEntity poll,
   });
+
+  // * poll
   Future<Either<Failure, Unit>> votePoll({
     required String pollId,
     required String optionId,

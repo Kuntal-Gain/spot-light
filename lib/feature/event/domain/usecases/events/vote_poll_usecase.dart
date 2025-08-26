@@ -2,10 +2,10 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../../core/errors/failures.dart';
 import '../../../../../core/usecase/usecase.dart';
-import '../../repo/appwrite_repository.dart';
+import '../../repo/firebase_repository.dart';
 
 class VotePollUsecase implements UseCase<Unit, VotePollParams> {
-  final AppwriteRepository repository;
+  final FirebaseRepository repository;
   VotePollUsecase(this.repository);
 
   @override

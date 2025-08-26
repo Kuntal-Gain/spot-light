@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "567724749320",
+    "project_id": "spot-time-b501d",
+    "storage_bucket": "spot-time-b501d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:567724749320:android:efc136b3037fd10703d7bd",
+        "android_client_info": {
+          "package_name": "com.example.spot_time"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNcvLaFgXX3ThVrwKdAs1okGYIY0P5mb0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

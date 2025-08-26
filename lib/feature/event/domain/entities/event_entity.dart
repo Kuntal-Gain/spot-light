@@ -1,18 +1,20 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
 class EventEntity extends Equatable {
-  final String id;
+  final String eventId;
   final String name;
   final String type; // e.g., "chat", "poll", "video"
   final List<String> participants; // userIds
   final String createdBy;
   final String messageId;
-  final DateTime createdAt;
+  final Timestamp createdAt;
   final String? description; // optional
   final String? coverImage; // optional
+  final String? lastMessage;
 
   const EventEntity({
-    required this.id,
+    required this.eventId,
     required this.name,
     required this.type,
     required this.participants,
@@ -21,11 +23,12 @@ class EventEntity extends Equatable {
     required this.createdAt,
     this.description,
     this.coverImage,
+    this.lastMessage,
   });
 
   @override
   List<Object?> get props => [
-        id,
+        eventId,
         name,
         type,
         participants,
@@ -34,5 +37,6 @@ class EventEntity extends Equatable {
         createdAt,
         description,
         coverImage,
+        lastMessage,
       ];
 }
