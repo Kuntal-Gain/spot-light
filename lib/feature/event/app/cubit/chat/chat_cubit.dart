@@ -1,53 +1,54 @@
 import 'dart:async';
-
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../../domain/entities/chat_entity.dart';
 import '../../../domain/usecases/events/fetch_messages_usecase.dart';
 import '../../../domain/usecases/events/send_message_usecase.dart';
+
 part 'chat_state.dart';
 
 class ChatCubit extends Cubit<ChatState> {
   final FetchMessagesUsecase fetchMessagesUsecase;
   final SendMessage sendMessageUsecase;
 
+  StreamSubscription? _messagesSub;
+
   ChatCubit({
     required this.fetchMessagesUsecase,
     required this.sendMessageUsecase,
   }) : super(ChatInitial());
 
-  void fetchMessages({required String messageId}) async {
-    if (isClosed) return;
+  /// Fetch + listen to messages in real-time
+  void fetchMessages({required String messageId}) {
+    emit(ChatLoading());
 
-    try {
-      emit(ChatLoading());
+    // Cancel any previous subscription to avoid leaks
+    _messagesSub?.cancel();
 
-      final result = fetchMessagesUsecase.call(messageId);
+    final result = fetchMessagesUsecase.call(messageId);
 
-      result.listen((either) {
-        either.fold(
-          (failure) => emit(ChatError(failure.toString())),
-          (messages) => emit(ChatLoaded(messages)),
-        );
-      }).onError((error) {
-        emit(ChatError(error.toString()));
-      });
-    } catch (e) {
-      emit(ChatError(e.toString()));
-    }
+    _messagesSub = result.listen((either) {
+      either.fold(
+        (failure) => emit(ChatError(failure.toString())),
+        (messages) => emit(ChatLoaded(messages)),
+      );
+    }, onError: (error) {
+      emit(ChatError(error.toString()));
+    });
   }
 
+  /// Send message with optimistic update
   Future<void> sendMessage({
     required MessageEntity message,
     required String messageId,
   }) async {
     try {
-      // Optimistic update (instant UI update before backend confirms)
+      // Optimistic update
       if (state is ChatLoaded) {
-        final currentMessages =
+        final current =
             List<MessageEntity>.from((state as ChatLoaded).messages);
-        emit(ChatLoaded([...currentMessages, message]));
+        emit(ChatLoaded([...current, message]));
       }
 
       final result = await sendMessageUsecase.call(
@@ -59,12 +60,17 @@ class ChatCubit extends Cubit<ChatState> {
           emit(ChatError(failure.toString()));
         },
         (_) {
-          // Do nothing: the subscription will update messages in real-time
-          // If you want, you can keep the optimistic update and skip emitting here
+          // No need to emit — stream subscription handles updates
         },
       );
     } catch (e) {
       emit(ChatError(e.toString()));
     }
+  }
+
+  @override
+  Future<void> close() {
+    _messagesSub?.cancel();
+    return super.close();
   }
 }

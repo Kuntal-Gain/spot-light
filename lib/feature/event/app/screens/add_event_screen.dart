@@ -166,12 +166,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
                           child: Padding(
                             padding: const EdgeInsets.all(8.0),
                             child: eventWidget(
-                              type: e,
-                              size: Size(
-                                mq.width * 0.3,
-                                mq.height * 0.05,
-                              ),
-                            ),
+                                type: e,
+                                size: Size(mq.width * 0.2, mq.height * 0.025)),
                           ),
                         );
                       }).toList(),

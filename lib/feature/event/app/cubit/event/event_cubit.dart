@@ -22,15 +22,23 @@ class EventCubit extends Cubit<EventState> {
 
   Future<void> createEvent({required EventEntity event}) async {
     emit(EventLoading());
+    print("[Cubit] createEvent called with: ${event.toString()}");
 
     try {
       final result = await addEventUseCase.call(event);
 
       result.fold(
-        (failure) => emit(EventError(failure.message)),
-        (event) => emit(EventCreated()),
+        (failure) {
+          print("[Cubit] Failed: ${failure.message}");
+          emit(EventError(failure.message));
+        },
+        (_) {
+          print("[Cubit] Success: Event created with ID -> ${event.eventId}");
+          emit(EventCreated());
+        },
       );
     } catch (e) {
+      print("[Cubit] Exception: $e");
       emit(EventError(e.toString()));
     }
   }

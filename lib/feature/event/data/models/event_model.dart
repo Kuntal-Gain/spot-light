@@ -20,13 +20,15 @@ class EventModel extends EventEntity {
     var ss = snap.data() as Map<String, dynamic>;
 
     return EventModel(
-      eventId: ss['eventId'],
+      eventId: ss['eventId'] ?? '',
       name: ss['name'] ?? '',
       type: ss['type'] ?? '',
       participants: List<String>.from(ss['participants'] ?? []),
       createdBy: ss['createdBy'] ?? '',
-      createdAt: ss['createdAt'] as Timestamp,
-      description: ss['description'],
+      createdAt: (ss['createdAt'] is Timestamp)
+          ? ss['createdAt'] as Timestamp
+          : Timestamp.now(),
+      description: ss['description'] ?? '',
       messageId: ss['messageId'] ?? '',
       coverImage: ss['coverImage'] ?? '',
       lastMessage: ss['lastMessage'] ?? '',

@@ -142,38 +142,63 @@ class RemoteDataSourceImpl implements RemoteDataSource {
     final eventCollection = firestore.collection(AppStrings.eventCollection);
 
     try {
+      printLog("debug", "Getting current UID...");
       final uid = await getCurrentUid();
+      printLog("debug", "Got UID: $uid");
 
-      // Create a new empty doc → Firestore generates a unique ID
+      // Create Firestore doc reference
       final docRef = eventCollection.doc();
+      final eventId = docRef.id;
+      final messageId = generateMessageId();
 
-      // Generate a unique messageId for RTDB
-      final msgId = generateMessageId();
+      printLog(
+          "debug", "Generated IDs -> eventId: $eventId, messageId: $messageId");
 
       final newEvent = EventModel(
-        eventId: docRef.id, // Firestore generated ID
+        eventId: eventId,
         name: event.name,
         type: event.type,
         participants: [uid],
         createdBy: uid,
-        messageId: msgId,
+        messageId: messageId,
         description: event.description,
-        createdAt: event.createdAt,
-        lastMessage: 'Start Discussion',
+        createdAt: Timestamp.now(),
       ).toMap();
 
-      // Save the event in Firestore
-      await docRef.set(newEvent);
+      printLog("debug", "Prepared newEvent map: $newEvent");
 
-      // 🔥 Create the root node for messages in RTDB
-      final dbRef = db.ref().child('events').child(msgId);
-      await dbRef.set({
-        'messages': {}, // initialize empty messages node
+      // Step 1: Save event in Firestore
+      printLog("debug", "Saving event in Firestore...");
+      await docRef.set(newEvent);
+      printLog("debug", "Event saved in Firestore ✅");
+
+      // Step 2: Save in Realtime DB
+      printLog("debug", "Saving event in Realtime Database...");
+
+      final initMessage = {
+        'senderId': 'server',
+        'content': 'Event created',
+        'mediaUrl': '',
+        'pollId': '',
+        'type': 'text',
+        'createdAt': ServerValue.timestamp,
+      };
+
+      await db.ref().child('events').child(messageId).set({
+        'messages': {
+          'init': initMessage, // ✅ structured properly, no more corrupted map
+        },
+        'participants': {
+          uid: true, // ✅ store as map for faster lookups
+        },
         'createdBy': uid,
         'createdAt': ServerValue.timestamp,
       });
-    } catch (e) {
-      printLog("err", e.toString());
+
+      printLog("debug", "Event saved in Realtime DB ✅");
+    } catch (e, stack) {
+      printLog("err", "Error in addEvent: $e");
+      printLog("err", "Stacktrace: $stack");
       throw ServerFailure(e.toString());
     }
   }
@@ -204,12 +229,8 @@ class RemoteDataSourceImpl implements RemoteDataSource {
   Future<void> sendMessage(MessageEntity message, String eventId) async {
     try {
       // Realtime DB ref
-      final dbRef = db
-          .ref()
-          .child('events')
-          .child(eventId)
-          .child('messages')
-          .push(); // push() auto-generates unique msg id
+      final dbRef =
+          db.ref().child('events').child(eventId).child('messages').push();
 
       final msgData = MessageModel(
         id: dbRef.key!,
@@ -225,6 +246,7 @@ class RemoteDataSourceImpl implements RemoteDataSource {
       // Update Firestore with last message
       final chatRef =
           firestore.collection(AppStrings.eventCollection).doc(eventId);
+
       await chatRef.update({
         'lastMessage': message.content,
       });
@@ -242,19 +264,18 @@ class RemoteDataSourceImpl implements RemoteDataSource {
 
     return dbRef.onValue.asyncMap((event) async {
       try {
-        // If no messages exist yet
-        if (event.snapshot.value == null) {
+        final raw = event.snapshot.value;
+        if (raw == null || raw is! Map) {
           return <MessageEntity>[];
         }
 
-        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        final data = Map<String, dynamic>.from(raw as Map);
 
         final List<MessageModel> messages = [];
 
         for (var entry in data.entries) {
           try {
             final msgMap = Map<String, dynamic>.from(entry.value);
-
             final message = MessageModel(
               id: entry.key,
               senderId: msgMap['senderId'] ?? "",
@@ -263,21 +284,18 @@ class RemoteDataSourceImpl implements RemoteDataSource {
               createdAt:
                   msgMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
             );
-
             messages.add(message);
           } catch (e) {
             printLog("warn", "Skipping corrupted message: $e");
           }
         }
 
-        // Sort messages by createdAt
         messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-        // Update last message in Firestore (safe check)
         if (messages.isNotEmpty) {
           final lastMessage = messages.last;
-          await chatRef
-              .update({'lastMessage': lastMessage.content}).catchError((e) {
+          await chatRef.set({'lastMessage': lastMessage.content},
+              SetOptions(merge: true)).catchError((e) {
             printLog("warn", "Failed to update lastMessage: $e");
           });
         }

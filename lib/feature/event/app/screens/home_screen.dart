@@ -78,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       return eventCard(
                         event: event,
+                        user: widget.user,
                         ctx: context,
                       );
                     },

@@ -7,6 +7,7 @@ class LoadingIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const CupertinoPageScaffold(
+      backgroundColor: AppColors.primary,
       child: Center(
         child: CupertinoActivityIndicator(
           radius: 20,

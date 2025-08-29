@@ -3,9 +3,13 @@ import 'package:spot_time/core/constants/app_color.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 
 import '../../../../core/utils/text_style.dart';
+import '../../domain/entities/user_entity.dart';
 import '../screens/chat_screen.dart';
 
-Widget eventCard({required EventEntity event, required BuildContext ctx}) {
+Widget eventCard(
+    {required EventEntity event,
+    required UserEntity user,
+    required BuildContext ctx}) {
   final mq = MediaQuery.of(ctx).size;
 
   return GestureDetector(
@@ -13,7 +17,11 @@ Widget eventCard({required EventEntity event, required BuildContext ctx}) {
       Navigator.push(
         ctx,
         MaterialPageRoute(
-          builder: (ctx) => ChatScreen(eventId: event.messageId),
+          builder: (ctx) => ChatScreen(
+            event: event,
+            messageID: event.messageId,
+            user: user,
+          ),
         ),
       );
     },
@@ -74,12 +82,12 @@ Widget eventCard({required EventEntity event, required BuildContext ctx}) {
                             size: mq.height * 0.025,
                           ),
                         ),
-                        eventWidget(
-                            type: eventTypeItems
-                                .firstWhere((e) => e.type == event.type),
-                            size: Size(mq.width * 0.25, mq.height * 0.03)),
                       ],
                     ),
+                    eventWidget(
+                        type: eventTypeItems
+                            .firstWhere((e) => e.type == event.type),
+                        size: Size(mq.width * 0.2, mq.height * 0.025)),
                     Text(
                       event.lastMessage ?? '',
                       style: bodyStyle(
@@ -130,7 +138,7 @@ Widget eventWidget({required EventTypeItem type, required Size size}) {
         type.type,
         style: headingStyle(
           color: AppColors.primary,
-          size: 12,
+          size: size.height * 0.6,
         ),
       ),
     ),
