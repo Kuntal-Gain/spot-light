@@ -1,11 +1,17 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:spot_time/core/constants/app_color.dart';
+import 'package:spot_time/core/constants/app_strings.dart';
+import 'package:spot_time/core/network/logger.dart';
 import 'package:spot_time/core/utils/size_box.dart';
+import 'package:spot_time/core/utils/time_formatter.dart';
 import 'package:spot_time/core/widgets/loading_indicators.dart';
+import 'package:spot_time/feature/event/data/models/user_model.dart';
 import 'package:spot_time/feature/event/domain/entities/chat_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
@@ -32,10 +38,22 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final DatabaseReference _messagesRef =
-      FirebaseDatabase.instance.ref('events');
+  // final DatabaseReference _messagesRef =
+  //     FirebaseDatabase.instance.ref('events');
 
   StreamSubscription<DatabaseEvent>? _messageSub;
+
+  Future<UserEntity?> fetchUser(String uid) async {
+    // example: pull from Firestore/Realtime DB
+    final snap = await FirebaseFirestore.instance
+        .collection(AppStrings.userCollection)
+        .doc(uid)
+        .get();
+    if (!snap.exists) return null;
+
+    final data = snap.data()!;
+    return UserModel.fromMap(data);
+  }
 
   void sendMessage() async {
     if (_controller.text.trim().isNotEmpty) {
@@ -58,16 +76,32 @@ class _ChatScreenState extends State<ChatScreen> {
 
       context
           .read<ChatCubit>()
-          .sendMessage(message: newMessage, messageId: widget.event.eventId);
+          .sendMessage(message: newMessage, event: widget.event);
 
       _controller.clear();
     }
   }
 
+  // ✅ Group messages by date
+  Map<String, List<MessageEntity>> groupMessagesByDate(
+      List<MessageEntity> messages) {
+    Map<String, List<MessageEntity>> grouped = {};
+    for (var msg in messages) {
+      final dateKey = formatDate(msg.createdAt);
+      grouped.putIfAbsent(dateKey, () => []);
+      grouped[dateKey]!.add(msg);
+    }
+    return grouped;
+  }
+
   @override
   void initState() {
     super.initState();
-    context.read<ChatCubit>().fetchMessages(messageId: widget.messageID);
+
+    printLog('info', widget.event.eventId);
+    printLog('info', widget.messageID);
+    context.read<ChatCubit>().fetchMessages(
+        messageId: widget.messageID, eventId: widget.event.eventId);
   }
 
   @override
@@ -78,93 +112,192 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  _bodyWidget(List<MessageEntity> messages) {
+// ✅ Main body widget
+  Widget _bodyWidget(List<MessageEntity> messages) {
+    final groupedMessages = groupMessagesByDate(messages);
+    final dateKeys = groupedMessages.keys.toList();
+
     return ListView.builder(
       controller: _scrollController,
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        final isMe = message.senderId == widget.user.uid;
+      itemCount: dateKeys.length,
+      itemBuilder: (context, dateIndex) {
+        final date = dateKeys[dateIndex];
+        final dayMessages = groupedMessages[date]!;
 
-        if (message.senderId.toLowerCase() == 'server') {
-          return Align(
-            alignment: Alignment.center, // or .centerRight later if needed
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.7, // cap width
-              ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 🔹 Date separator
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                ),
+                    const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
                 child: Text(
-                  message.content,
-                  softWrap: true,
-                  maxLines: null,
-                  style: const TextStyle(
-                    color: Colors.black87,
-                    fontSize: 15,
+                  date,
+                  style: headingStyle(
+                    size: 22,
+                    color: AppColors.secondary,
                   ),
                 ),
               ),
             ),
-          );
-        } else {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 12),
-            child: Align(
-              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-              child: Row(
-                mainAxisAlignment:
-                    isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                children: [
-                  if (!isMe)
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundImage: widget.user.avatar.isNotEmpty
-                          ? NetworkImage(widget.user.avatar)
-                          : null,
-                    ),
 
-                  // message bubble
-                  Container(
-                    margin:
-                        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      border:
-                          Border.all(color: AppColors.secondary, width: 1.8),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
+            // 🔹 Messages under that date
+            ...dayMessages.map((message) => _buildMessageItem(message)),
+          ],
+        );
+      },
+    );
+  }
+
+// ✅ Extracted message item (your old code refactored)
+  Widget _buildMessageItem(MessageEntity message) {
+    final isMe = message.senderId == widget.user.uid;
+
+    if (message.senderId.toLowerCase() == 'server') {
+      return Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.7,
+          ),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(color: Colors.grey.shade300),
+            child: Text(
+              message.content,
+              softWrap: true,
+              maxLines: null,
+              style: const TextStyle(color: Colors.black87, fontSize: 15),
+            ),
+          ),
+        ),
+      );
+    } else {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 12),
+        child: Align(
+          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: Row(
+            mainAxisAlignment:
+                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            children: [
+              if (!isMe)
+                FutureBuilder(
+                  future: fetchUser(message.senderId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.done) {
+                      final user = snapshot.data;
+                      return Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppColors.secondary, width: 1.8),
+                        ),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AppColors.secondary,
+                          backgroundImage: (user!.avatar.isNotEmpty)
+                              ? NetworkImage(user.avatar)
+                              : null,
+                          child: (user.avatar.isEmpty)
+                              ? Text(
+                                  (user.name.isNotEmpty)
+                                      ? user.name[0].toUpperCase()
+                                      : "?",
+                                  style: headingStyle(
+                                      color: AppColors.primary, size: 22),
+                                )
+                              : null,
+                        ),
+                      );
+                    } else if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const CupertinoActivityIndicator();
+                    } else {
+                      return sizeZ();
+                    }
+                  },
+                ),
+
+              // 🔹 Message bubble
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isMe ? AppColors.primary : AppColors.secondary,
+                  border: Border.all(color: AppColors.secondary, width: 1.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       message.content,
                       softWrap: true,
                       maxLines: null,
                       style: bodyStyle(
-                        color: AppColors.secondary,
+                        color: isMe ? AppColors.secondary : AppColors.primary,
                         size: 15,
                       ),
                     ),
-                  ),
-
-                  if (isMe)
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundImage: widget.user.avatar.isNotEmpty
-                          ? NetworkImage(widget.user.avatar)
-                          : null,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Icon(
+                          Icons.access_time_outlined,
+                          color: isMe ? AppColors.secondary : AppColors.primary,
+                          size: 18,
+                        ),
+                        sizeHor(5),
+                        Text(
+                          getTime(message.createdAt),
+                          softWrap: true,
+                          maxLines: null,
+                          style: bodyStyle(
+                            color:
+                                isMe ? AppColors.secondary : AppColors.primary,
+                            size: 9,
+                          ),
+                        ),
+                      ],
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        }
-      },
-    );
+
+              if (isMe)
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.secondary, width: 1.8),
+                  ),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppColors.primary,
+                    backgroundImage: (widget.user.avatar.isNotEmpty)
+                        ? NetworkImage(widget.user.avatar)
+                        : null,
+                    child: (widget.user.avatar.isEmpty)
+                        ? Text(
+                            (widget.user.name.isNotEmpty)
+                                ? widget.user.name[0].toUpperCase()
+                                : "?",
+                            style: headingStyle(
+                                color: AppColors.secondary, size: 22),
+                          )
+                        : null,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -204,7 +337,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     style: headingStyle(size: 18, color: AppColors.secondary)),
                 sizeVar(5),
                 Text('${widget.event.participants.length} members',
-                    style: TextStyle(color: Colors.grey, fontSize: 14)),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14)),
               ],
             ),
           ],
@@ -257,7 +390,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             Border.all(color: AppColors.primary, width: 1.8),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.attach_file, color: AppColors.primary),
+                      child: const Icon(Icons.attach_file,
+                          color: AppColors.primary),
                     ),
                   ),
 
@@ -277,10 +411,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           size: 15,
                         ),
                         controller: _controller,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: "Type a message...",
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
+                          contentPadding: EdgeInsets.symmetric(
                               vertical: 10, horizontal: 16),
                         ),
                       ),
@@ -303,7 +437,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               Border.all(color: AppColors.primary, width: 1.8),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.send, color: AppColors.primary),
+                        child: const Icon(Icons.send, color: AppColors.primary),
                       ),
                     ),
                   ),
@@ -312,6 +446,16 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 64),
+        child: FloatingActionButton(
+          backgroundColor: AppColors.secondary,
+          onPressed: () {
+            // TODO : poll functionality
+          },
+          child: const Icon(Icons.poll, color: AppColors.primary),
+        ),
       ),
     );
   }

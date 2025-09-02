@@ -61,7 +61,7 @@ class CredCubit extends Cubit<CredState> {
 
     try {
       final result = await registerWithEmail.call(
-        RegisterParams(email: email, password: password),
+        RegisterParams(name: name, email: email, password: password),
       );
 
       result.fold(

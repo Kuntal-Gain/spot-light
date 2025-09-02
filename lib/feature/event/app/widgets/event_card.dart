@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:spot_time/core/constants/app_color.dart';
+import 'package:spot_time/core/network/logger.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 
 import '../../../../core/utils/text_style.dart';
+import '../../../../core/utils/time_formatter.dart';
 import '../../domain/entities/user_entity.dart';
 import '../screens/chat_screen.dart';
 
@@ -12,8 +14,13 @@ Widget eventCard(
     required BuildContext ctx}) {
   final mq = MediaQuery.of(ctx).size;
 
+  printLog("info",
+      "key : ${event.lastMessageTime.toString()} , Type : ${event.lastMessageTime.runtimeType}");
+
   return GestureDetector(
     onTap: () {
+      printLog("info", event.messageId);
+
       Navigator.push(
         ctx,
         MaterialPageRoute(
@@ -33,11 +40,11 @@ Widget eventCard(
         border: Border.all(color: AppColors.secondary, width: 1.8),
         borderRadius: BorderRadius.circular(5),
         color: AppColors.primary,
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: AppColors.secondary,
             spreadRadius: 3,
-            offset: const Offset(10, 10),
+            offset: Offset(10, 10),
           ),
         ],
       ),
@@ -66,7 +73,7 @@ Widget eventCard(
                         ),
                       ),
               ),
-              Container(
+              SizedBox(
                 height: mq.height * 0.1,
                 width: mq.width * 0.6,
                 child: Column(
@@ -88,12 +95,24 @@ Widget eventCard(
                         type: eventTypeItems
                             .firstWhere((e) => e.type == event.type),
                         size: Size(mq.width * 0.2, mq.height * 0.025)),
-                    Text(
-                      event.lastMessage ?? '',
-                      style: bodyStyle(
-                        color: AppColors.secondary,
-                        size: mq.height * 0.012,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          event.lastMessage ?? '',
+                          style: bodyStyle(
+                            color: AppColors.secondary,
+                            size: mq.height * 0.012,
+                          ),
+                        ),
+                        Text(
+                          formatDateTime(event.lastMessageTime!),
+                          style: bodyStyle(
+                            color: AppColors.secondary,
+                            size: mq.height * 0.012,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

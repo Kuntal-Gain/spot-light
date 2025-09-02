@@ -1,7 +1,6 @@
 // lib/features/auth/domain/usecases/login_with_email.dart
 import '../../../../../core/usecase/usecase.dart';
 import '../../../../../core/errors/failures.dart';
-import '../../entities/user_entity.dart';
 import '../../repo/firebase_repository.dart';
 import 'package:dartz/dartz.dart';
 

@@ -6,10 +6,8 @@ import 'package:spot_time/feature/event/app/cubit/event/event_cubit.dart';
 import 'package:spot_time/feature/event/app/widgets/event_card.dart';
 import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
 
-import '../../../../core/usecase/usecase.dart';
+import '../../../../core/network/logger.dart';
 import '../../../../core/widgets/loading_indicators.dart';
-import '../../domain/entities/event_entity.dart';
-import '../cubit/cred/cred_cubit.dart';
 import 'add_event_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -58,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             BlocBuilder<EventCubit, EventState>(
               builder: (context, state) {
-                print(state);
+                printLog("info", "[Cubit] State: $state");
                 if (state is EventLoading) {
                   return const LoadingIndicator();
                 }
@@ -96,11 +94,11 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.primary,
             border: Border.all(color: AppColors.secondary, width: 1.8),
             // borderRadius: BorderRadius.circular(10),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 color: AppColors.secondary,
                 spreadRadius: 3,
-                offset: const Offset(9, 9),
+                offset: Offset(9, 9),
               ),
             ],
           ),

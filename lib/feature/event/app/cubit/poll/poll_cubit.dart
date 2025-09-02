@@ -1,5 +1,4 @@
 import 'package:bloc/bloc.dart';
-import 'package:dartz/dartz.dart';
 import 'package:spot_time/feature/event/domain/entities/poll_entity.dart';
 import 'package:spot_time/feature/event/domain/usecases/events/create_poll_usecase.dart';
 import 'package:spot_time/feature/event/domain/usecases/events/vote_poll_usecase.dart';

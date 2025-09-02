@@ -5,12 +5,19 @@ import 'package:dartz/dartz.dart';
 import '../../../../../core/errors/failures.dart';
 
 class FetchMessagesUsecase
-    implements StreamUseCase<List<MessageEntity>, String> {
+    implements StreamUseCase<List<MessageEntity>, FetchMessageParams> {
   final FirebaseRepository repository;
   FetchMessagesUsecase(this.repository);
 
   @override
-  Stream<Either<Failure, List<MessageEntity>>> call(String eventId) {
-    return repository.subscribeMessages(eventId);
+  Stream<Either<Failure, List<MessageEntity>>> call(FetchMessageParams params) {
+    return repository.subscribeMessages(params.eventId, params.messageId);
   }
+}
+
+class FetchMessageParams {
+  final String eventId;
+  final String messageId;
+
+  FetchMessageParams({required this.eventId, required this.messageId});
 }

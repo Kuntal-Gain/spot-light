@@ -9,9 +9,13 @@ import '../../domain/entities/event_entity.dart';
 abstract class RemoteDataSource {
   Future<void> loginWithEmail(
       {required String email, required String password});
-  Future<void> registerWithEmail(
-      {required String email, required String password});
+  Future<void> registerWithEmail({
+    required String name,
+    required String email,
+    required String password,
+  });
   Future<UserEntity> getCurrentUser();
+  Future<UserEntity?> getUserByUID(String uid);
   Future<String> getCurrentUid();
   Future<void> logout();
   Future<bool> isUserLoggedIn();
@@ -23,8 +27,9 @@ abstract class RemoteDataSource {
   Future<EventEntity> getSingleEvent(String eventId);
 
   // * messages
-  Future<void> sendMessage(MessageEntity message, String eventId);
-  Stream<List<MessageEntity>> subscribeMessages(String eventId);
+  Future<void> sendMessage(MessageEntity message, EventEntity event);
+  Stream<List<MessageEntity>> subscribeMessages(
+      String eventId, String messageId);
 
   // * polls
   Future<void> createPoll(PollEntity poll);

@@ -12,6 +12,7 @@ class EventEntity extends Equatable {
   final String? description; // optional
   final String? coverImage; // optional
   final String? lastMessage;
+  final Timestamp? lastMessageTime;
 
   const EventEntity({
     required this.eventId,
@@ -24,6 +25,7 @@ class EventEntity extends Equatable {
     this.description,
     this.coverImage,
     this.lastMessage,
+    this.lastMessageTime,
   });
 
   @override
@@ -38,5 +40,6 @@ class EventEntity extends Equatable {
         description,
         coverImage,
         lastMessage,
+        lastMessageTime,
       ];
 }

@@ -1,3 +1,5 @@
+import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
+
 import '../../../../../core/usecase/usecase.dart';
 import '../../../../../core/errors/failures.dart';
 import '../../entities/chat_entity.dart';
@@ -11,18 +13,18 @@ class SendMessage implements UseCase<Unit, SendMessageParams> {
   @override
   Future<Either<Failure, Unit>> call(SendMessageParams params) {
     return repository.sendMessage(
-      eventId: params.eventId,
+      event: params.event,
       message: params.message,
     );
   }
 }
 
 class SendMessageParams {
-  final String eventId;
+  final EventEntity event;
   final MessageEntity message;
 
   SendMessageParams({
-    required this.eventId,
+    required this.event,
     required this.message,
   });
 }

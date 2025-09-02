@@ -4,6 +4,7 @@ import 'package:spot_time/core/usecase/usecase.dart';
 import 'package:spot_time/feature/event/domain/usecases/events/add_event_usecase.dart';
 import 'package:spot_time/feature/event/domain/usecases/events/get_single_event_usecase.dart';
 
+import '../../../../../core/network/logger.dart';
 import '../../../domain/entities/event_entity.dart';
 import '../../../domain/usecases/events/get_events_usecase.dart';
 
@@ -22,23 +23,24 @@ class EventCubit extends Cubit<EventState> {
 
   Future<void> createEvent({required EventEntity event}) async {
     emit(EventLoading());
-    print("[Cubit] createEvent called with: ${event.toString()}");
+    printLog("info", "[Cubit] createEvent called with: ${event.toString()}");
 
     try {
       final result = await addEventUseCase.call(event);
 
       result.fold(
         (failure) {
-          print("[Cubit] Failed: ${failure.message}");
+          printLog("err", "[Cubit] Failed: ${failure.message}");
           emit(EventError(failure.message));
         },
         (_) {
-          print("[Cubit] Success: Event created with ID -> ${event.eventId}");
+          printLog("info",
+              "[Cubit] Success: Event created with ID -> ${event.eventId}");
           emit(EventCreated());
         },
       );
     } catch (e) {
-      print("[Cubit] Exception: $e");
+      printLog("err", "[Cubit] Exception: $e");
       emit(EventError(e.toString()));
     }
   }
@@ -54,6 +56,7 @@ class EventCubit extends Cubit<EventState> {
         (events) => emit(EventsLoaded(events)),
       );
     } catch (e) {
+      printLog("err", "[Cubit] Exception: $e");
       emit(EventError(e.toString()));
     }
   }
@@ -69,6 +72,7 @@ class EventCubit extends Cubit<EventState> {
         (event) => emit(SingleEventLoaded(event)),
       );
     } catch (e) {
+      printLog("err", "[Cubit] Exception: $e");
       emit(EventError(e.toString()));
     }
   }

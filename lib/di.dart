@@ -19,6 +19,7 @@ import 'feature/event/data/repo/firebase_repository_impl.dart';
 import 'feature/event/domain/repo/firebase_repository.dart';
 import 'feature/event/domain/usecases/auth/get_current_uid_usecase.dart';
 import 'feature/event/domain/usecases/auth/get_current_user.dart';
+import 'feature/event/domain/usecases/auth/get_user_usecase.dart';
 import 'feature/event/domain/usecases/auth/is_user_loggedin.dart';
 import 'feature/event/domain/usecases/auth/login_with_email.dart';
 import 'feature/event/domain/usecases/auth/logout_user.dart';
@@ -46,6 +47,7 @@ void init() {
     () => AuthCubit(
       isUserLoggedIn: sl.call(),
       getCurrentUser: sl.call(),
+      getUserUseCase: sl.call(),
     ),
   );
 
@@ -83,6 +85,7 @@ void init() {
   sl.registerLazySingleton<GetCurrentUid>(() => GetCurrentUid(sl.call()));
   sl.registerLazySingleton<CreateUserUseCase>(
       () => CreateUserUseCase(sl.call()));
+  sl.registerLazySingleton<GetUserUseCase>(() => GetUserUseCase(sl.call()));
 
   sl.registerLazySingleton<AddEvent>(() => AddEvent(sl.call()));
   sl.registerLazySingleton<GetEvents>(() => GetEvents(sl.call()));

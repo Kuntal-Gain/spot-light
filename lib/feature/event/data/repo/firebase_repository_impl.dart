@@ -29,11 +29,13 @@ class FirebaseRepositoryImpl implements FirebaseRepository {
 
   @override
   Future<Either<Failure, void>> registerWithEmail({
+    required String name,
     required String email,
     required String password,
   }) async {
     try {
       await remoteDataSource.registerWithEmail(
+        name: name,
         email: email,
         password: password,
       );
@@ -117,11 +119,11 @@ class FirebaseRepositoryImpl implements FirebaseRepository {
   // ---------------- CHAT ----------------
   @override
   Future<Either<Failure, Unit>> sendMessage({
-    required String eventId,
+    required EventEntity event,
     required MessageEntity message,
   }) async {
     try {
-      await remoteDataSource.sendMessage(message, eventId);
+      await remoteDataSource.sendMessage(message, event);
       return const Right(unit);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -130,9 +132,9 @@ class FirebaseRepositoryImpl implements FirebaseRepository {
 
   @override
   Stream<Either<Failure, List<MessageEntity>>> subscribeMessages(
-      String eventId) {
+      String eventId, String messageId) {
     try {
-      return remoteDataSource.subscribeMessages(eventId).map(
+      return remoteDataSource.subscribeMessages(eventId, messageId).map(
             (messages) => Right(messages),
           );
     } catch (e) {
@@ -170,6 +172,16 @@ class FirebaseRepositoryImpl implements FirebaseRepository {
     try {
       await remoteDataSource.createUser(user: user);
       return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserEntity?>> getUserByUID(String uid) async {
+    try {
+      final user = await remoteDataSource.getUserByUID(uid);
+      return Right(user);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 
 import '../../../domain/entities/chat_entity.dart';
 import '../../../domain/usecases/events/fetch_messages_usecase.dart';
@@ -20,13 +21,14 @@ class ChatCubit extends Cubit<ChatState> {
   }) : super(ChatInitial());
 
   /// Fetch + listen to messages in real-time
-  void fetchMessages({required String messageId}) {
+  void fetchMessages({required String messageId, required String eventId}) {
     emit(ChatLoading());
 
     // Cancel any previous subscription to avoid leaks
     _messagesSub?.cancel();
 
-    final result = fetchMessagesUsecase.call(messageId);
+    final result = fetchMessagesUsecase
+        .call(FetchMessageParams(messageId: messageId, eventId: eventId));
 
     _messagesSub = result.listen((either) {
       either.fold(
@@ -41,7 +43,7 @@ class ChatCubit extends Cubit<ChatState> {
   /// Send message with optimistic update
   Future<void> sendMessage({
     required MessageEntity message,
-    required String messageId,
+    required EventEntity event,
   }) async {
     try {
       // Optimistic update
@@ -52,7 +54,7 @@ class ChatCubit extends Cubit<ChatState> {
       }
 
       final result = await sendMessageUsecase.call(
-        SendMessageParams(eventId: messageId, message: message),
+        SendMessageParams(event: event, message: message),
       );
 
       result.fold(

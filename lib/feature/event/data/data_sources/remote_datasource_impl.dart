@@ -1,9 +1,6 @@
 // lib/features/auth/data/datasources/remote_datasource_impl.dart
-import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:spot_time/core/errors/failures.dart';
 import 'package:spot_time/feature/event/data/models/event_model.dart';
-import 'package:spot_time/feature/event/data/models/poll_model.dart';
 import 'package:spot_time/feature/event/domain/entities/chat_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/poll_entity.dart';
@@ -37,6 +34,20 @@ class RemoteDataSourceImpl implements RemoteDataSource {
   Future<UserEntity> getCurrentUser() async => UserModel.fromMap(
       (await firestore.collection('users').doc(auth.currentUser!.uid).get())
           .data()!);
+
+  @override
+  Future<UserEntity?> getUserByUID(String uid) {
+    final userDoc =
+        firestore.collection(AppStrings.userCollection).doc(uid).get();
+
+    return userDoc.then((doc) {
+      if (doc.exists) {
+        return UserModel.fromMap(doc.data()!);
+      } else {
+        return null;
+      }
+    });
+  }
 
   @override
   Future<bool> isUserLoggedIn() async => auth.currentUser!.uid != null;
@@ -73,7 +84,9 @@ class RemoteDataSourceImpl implements RemoteDataSource {
 
   @override
   Future<void> registerWithEmail(
-      {required String email, required String password}) async {
+      {required String name,
+      required String email,
+      required String password}) async {
     try {
       if (email.isEmpty || password.isEmpty) {
         throw ServerFailure('Email and password are required');
@@ -86,7 +99,7 @@ class RemoteDataSourceImpl implements RemoteDataSource {
           createUser(
             user: UserEntity(
               uid: value.user!.uid,
-              name: '',
+              name: name,
               email: email,
               avatar: '',
               events: const [],
@@ -226,11 +239,18 @@ class RemoteDataSourceImpl implements RemoteDataSource {
   // ---------------- CHAT ----------------
 
   @override
-  Future<void> sendMessage(MessageEntity message, String eventId) async {
+  Future<void> sendMessage(MessageEntity message, EventEntity event) async {
     try {
-      // Realtime DB ref
-      final dbRef =
-          db.ref().child('events').child(eventId).child('messages').push();
+      printLog("info", "➡️ Sending message | eventId: ${event.eventId}");
+
+      // Realtime DB ref (chat thread)
+      final dbRef = db
+          .ref()
+          .child('events')
+          .child(event.messageId)
+          .child('messages')
+          .push();
+      printLog("info", "RTDB path: ${dbRef.path}");
 
       final msgData = MessageModel(
         id: dbRef.key!,
@@ -240,16 +260,21 @@ class RemoteDataSourceImpl implements RemoteDataSource {
         createdAt: message.createdAt,
       ).toMap();
 
+      printLog("info", "Prepared msgData: $msgData");
+
       // Save message in Realtime Database
       await dbRef.set(msgData);
+      printLog("info", "✅ Message saved in RTDB key: ${dbRef.key}");
 
-      // Update Firestore with last message
+      // Update Firestore event with last message
       final chatRef =
-          firestore.collection(AppStrings.eventCollection).doc(eventId);
+          firestore.collection(AppStrings.eventCollection).doc(event.eventId);
 
       await chatRef.update({
         'lastMessage': message.content,
+        'lastMessageAt': FieldValue.serverTimestamp(),
       });
+      printLog("info", "✅ Firestore event updated with lastMessage");
     } catch (e) {
       printLog("err", "Error sending message: $e");
       throw ServerFailure(e.toString());
@@ -257,19 +282,27 @@ class RemoteDataSourceImpl implements RemoteDataSource {
   }
 
   @override
-  Stream<List<MessageEntity>> subscribeMessages(String messageId) {
+  Stream<List<MessageEntity>> subscribeMessages(
+      String eventId, String messageId) {
+    printLog("info",
+        "📡 Subscribing messages | eventId: $eventId | messageId: $messageId");
+
     final dbRef = db.ref().child('events').child(messageId).child('messages');
     final chatRef =
-        firestore.collection(AppStrings.eventCollection).doc(messageId);
+        firestore.collection(AppStrings.eventCollection).doc(eventId);
 
     return dbRef.onValue.asyncMap((event) async {
       try {
         final raw = event.snapshot.value;
+        printLog("info", "Snapshot value: $raw");
+
         if (raw == null || raw is! Map) {
+          printLog("warn", "⚠️ No messages found yet");
           return <MessageEntity>[];
         }
 
         final data = Map<String, dynamic>.from(raw as Map);
+        printLog("info", "Parsed ${data.length} messages");
 
         final List<MessageModel> messages = [];
 
@@ -285,18 +318,24 @@ class RemoteDataSourceImpl implements RemoteDataSource {
                   msgMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
             );
             messages.add(message);
+            printLog("info", "Message parsed: ${message.toMap()}");
           } catch (e) {
-            printLog("warn", "Skipping corrupted message: $e");
+            printLog("warn", "⚠️ Skipping corrupted message: $e");
           }
         }
 
         messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        printLog("info", "Messages sorted. Total: ${messages.length}");
 
         if (messages.isNotEmpty) {
           final lastMessage = messages.last;
-          await chatRef.set({'lastMessage': lastMessage.content},
-              SetOptions(merge: true)).catchError((e) {
-            printLog("warn", "Failed to update lastMessage: $e");
+          printLog("info", "Updating lastMessage: ${lastMessage.content}");
+
+          await chatRef.set(
+            {'lastMessage': lastMessage.content},
+            SetOptions(merge: true),
+          ).catchError((e) {
+            printLog("warn", "⚠️ Failed to update lastMessage: $e");
           });
         }
 

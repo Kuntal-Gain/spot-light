@@ -14,6 +14,7 @@ class EventModel extends EventEntity {
     super.description,
     super.coverImage,
     super.lastMessage,
+    super.lastMessageTime,
   });
 
   factory EventModel.fromSnapshot(DocumentSnapshot snap) {
@@ -32,6 +33,7 @@ class EventModel extends EventEntity {
       messageId: ss['messageId'] ?? '',
       coverImage: ss['coverImage'] ?? '',
       lastMessage: ss['lastMessage'] ?? '',
+      lastMessageTime: ss['lastMessageAt'] ?? Timestamp.now(),
     );
   }
 
@@ -47,6 +49,7 @@ class EventModel extends EventEntity {
       'coverImage': coverImage,
       'createdAt': createdAt,
       'lastMessage': lastMessage,
+      'lastMessageAt': lastMessageTime,
     };
   }
 }

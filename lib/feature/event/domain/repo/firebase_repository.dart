@@ -14,6 +14,7 @@ abstract class FirebaseRepository {
     required String password,
   });
   Future<Either<Failure, void>> registerWithEmail({
+    required String name,
     required String email,
     required String password,
   });
@@ -21,6 +22,7 @@ abstract class FirebaseRepository {
     required UserEntity user,
   });
   Future<Either<Failure, UserEntity?>> getCurrentUser();
+  Future<Either<Failure, UserEntity?>> getUserByUID(String uid);
   Future<Either<Failure, String>> getCurrentUid();
   Future<Either<Failure, void>> logout();
   Future<Either<Failure, bool>> isUserLoggedIn();
@@ -33,11 +35,11 @@ abstract class FirebaseRepository {
 
   // * chat
   Future<Either<Failure, Unit>> sendMessage({
-    required String eventId,
+    required EventEntity event,
     required MessageEntity message,
   });
   Stream<Either<Failure, List<MessageEntity>>> subscribeMessages(
-      String eventId);
+      String eventId, String messageId);
   Future<Either<Failure, Unit>> createNewPoll({
     required PollEntity poll,
   });
