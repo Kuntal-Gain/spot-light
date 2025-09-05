@@ -1,67 +1,91 @@
-import 'dart:convert';
-import 'package:spot_time/feature/event/domain/entities/poll_entity.dart';
+import '../../domain/entities/poll_entity.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class PollModel extends PollEntity {
   PollModel({
-    required super.id,
-    required super.eventId,
-    required super.question,
-    required super.options,
-    required super.createdAt,
-    required super.createdBy,
-    super.expiresAt,
-  });
-
-  factory PollModel.fromMap(Map<String, dynamic> map) {
-    return PollModel(
-      id: map['\$id'],
-      eventId: map['eventId'],
-      question: map['question'],
-      options: map['options'] != null
-          ? (jsonDecode(map['options']) as List<dynamic>)
-              .map((e) => PollOptionModel.fromMap(e))
-              .toList()
-          : [],
-      createdAt: DateTime.parse(map['\$createdAt']),
-      createdBy: map['createdBy'],
-      expiresAt:
-          map['expiresAt'] != null ? DateTime.parse(map['expiresAt']) : null,
-    );
-  }
+    required String id,
+    required String eventId,
+    required String question,
+    required List<PollOptionEntity> options,
+    required String createdBy,
+    required DateTime createdAt,
+    DateTime? expiresAt,
+  }) : super(
+          id: id,
+          eventId: eventId,
+          question: question,
+          options: options,
+          createdBy: createdBy,
+          createdAt: createdAt,
+          expiresAt: expiresAt,
+        );
 
   Map<String, dynamic> toMap() {
-    return {
-      'eventId': eventId,
-      'question': question,
-      // Encode options list as JSON string
-      'options': jsonEncode(
-        options.map((op) => (op as PollOptionModel).toMap()).toList(),
-      ),
-      'expiresAt': expiresAt?.toIso8601String(),
+    final optionsMap = {
+      for (var opt in options)
+        opt.id: {
+          'id': opt.id,
+          'text': opt.text,
+          'votes': opt.votes,
+        }
     };
-  }
-}
 
-class PollOptionModel extends PollOptionEntity {
-  PollOptionModel({
-    required super.id,
-    required super.text,
-    required super.votes,
-  });
-
-  factory PollOptionModel.fromMap(Map<String, dynamic> map) {
-    return PollOptionModel(
-      id: map['id'],
-      text: map['text'],
-      votes: map['votes'],
-    );
-  }
-
-  Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'text': text,
-      'votes': votes,
+      'eventId': eventId,
+      'question': question,
+      'options': optionsMap, // ✅ store as map instead of list
+      'createdBy': createdBy,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'expiresAt': expiresAt?.millisecondsSinceEpoch,
     };
   }
+
+  factory PollModel.fromSnapshot(DataSnapshot snapshot) {
+    final data = Map<String, dynamic>.from(snapshot.value as Map);
+
+    // 🔎 Handle options as Map
+    final optionsData = data['options'];
+    List<PollOptionEntity> optionsList = [];
+
+    if (optionsData is Map) {
+      // case 1: options stored as {op1: {...}, op0: {...}}
+      optionsList = optionsData.values.map((opt) {
+        final optMap = Map<String, dynamic>.from(opt as Map);
+        return PollOptionEntity(
+          id: optMap['id'] as String,
+          text: optMap['text'] as String,
+          votes: optMap['votes'] != null
+              ? Map<String, dynamic>.from(optMap['votes'])
+              : {},
+        );
+      }).toList();
+    } else if (optionsData is List) {
+      // case 2: options stored as [ {...}, {...} ]
+      optionsList = optionsData.map((opt) {
+        final optMap = Map<String, dynamic>.from(opt as Map);
+        return PollOptionEntity(
+          id: optMap['id'] as String,
+          text: optMap['text'] as String,
+          votes: optMap['votes'] != null
+              ? Map<String, dynamic>.from(optMap['votes'])
+              : {},
+        );
+      }).toList();
+    }
+
+    return PollModel(
+      id: data['id'] as String,
+      eventId: data['eventId'] as String,
+      question: data['question'] as String,
+      options: optionsList,
+      createdBy: data['createdBy'] as String,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(data['createdAt']),
+      expiresAt: data['expiresAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(data['expiresAt'])
+          : null,
+    );
+  }
+
+  PollEntity toEntity() => this;
 }

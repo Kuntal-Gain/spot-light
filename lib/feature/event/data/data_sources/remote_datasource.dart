@@ -33,5 +33,6 @@ abstract class RemoteDataSource {
 
   // * polls
   Future<void> createPoll(PollEntity poll);
+  Future<PollEntity> getSinglePoll(String pollId);
   Future<void> votePoll({required String pollId, required String optionId});
 }

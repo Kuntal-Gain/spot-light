@@ -40,11 +40,13 @@ abstract class FirebaseRepository {
   });
   Stream<Either<Failure, List<MessageEntity>>> subscribeMessages(
       String eventId, String messageId);
+  // * poll
   Future<Either<Failure, Unit>> createNewPoll({
     required PollEntity poll,
   });
 
-  // * poll
+  Future<Either<Failure, PollEntity>> getSinglePoll(String pollId);
+
   Future<Either<Failure, Unit>> votePoll({
     required String pollId,
     required String optionId,

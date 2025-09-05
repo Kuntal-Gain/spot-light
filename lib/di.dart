@@ -7,9 +7,9 @@ import 'package:spot_time/feature/event/app/cubit/cred/cred_cubit.dart';
 import 'package:spot_time/feature/event/app/cubit/event/event_cubit.dart';
 import 'package:spot_time/feature/event/domain/usecases/auth/create_user_usecase.dart';
 import 'package:spot_time/feature/event/domain/usecases/events/add_event_usecase.dart';
-import 'package:spot_time/feature/event/domain/usecases/events/create_poll_usecase.dart';
+import 'package:spot_time/feature/event/domain/usecases/poll/create_poll_usecase.dart';
 import 'package:spot_time/feature/event/domain/usecases/events/send_message_usecase.dart';
-import 'package:spot_time/feature/event/domain/usecases/events/vote_poll_usecase.dart';
+import 'package:spot_time/feature/event/domain/usecases/poll/vote_poll_usecase.dart';
 import 'feature/event/app/cubit/auth/auth_cubit.dart';
 import 'feature/event/app/cubit/chat/chat_cubit.dart';
 import 'feature/event/app/cubit/poll/poll_cubit.dart';
@@ -27,6 +27,7 @@ import 'feature/event/domain/usecases/auth/register_with_email.dart';
 import 'feature/event/domain/usecases/events/fetch_messages_usecase.dart';
 import 'feature/event/domain/usecases/events/get_events_usecase.dart';
 import 'feature/event/domain/usecases/events/get_single_event_usecase.dart';
+import 'feature/event/domain/usecases/poll/get_single_poll_usecase.dart';
 
 final sl = GetIt.instance;
 
@@ -70,6 +71,7 @@ void init() {
     () => PollCubit(
       createNewPollUsecase: sl.call(),
       votePollUsecase: sl.call(),
+      getSinglePollUsecase: sl.call(),
     ),
   );
 
@@ -95,6 +97,7 @@ void init() {
   sl.registerLazySingleton<SendMessage>(() => SendMessage(sl.call()));
   sl.registerLazySingleton<CreateNewPoll>(() => CreateNewPoll(sl.call()));
   sl.registerLazySingleton<VotePollUsecase>(() => VotePollUsecase(sl.call()));
+  sl.registerLazySingleton<GetSinglePoll>(() => GetSinglePoll(sl.call()));
 
   // TODO: other usecases
 

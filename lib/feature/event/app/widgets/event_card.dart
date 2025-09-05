@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:spot_time/core/constants/app_color.dart';
 import 'package:spot_time/core/network/logger.dart';
+import 'package:spot_time/core/utils/size_box.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
 
 import '../../../../core/utils/text_style.dart';
@@ -94,10 +95,10 @@ Widget eventCard(
                     eventWidget(
                         type: eventTypeItems
                             .firstWhere((e) => e.type == event.type),
-                        size: Size(mq.width * 0.2, mq.height * 0.025)),
+                        size: Size(mq.width * 0.18, mq.height * 0.02)),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        sizeHor(10),
                         Text(
                           event.lastMessage ?? '',
                           style: bodyStyle(
@@ -105,11 +106,12 @@ Widget eventCard(
                             size: mq.height * 0.012,
                           ),
                         ),
+                        const Spacer(),
                         Text(
                           formatDateTime(event.lastMessageTime!),
                           style: bodyStyle(
                             color: AppColors.secondary,
-                            size: mq.height * 0.012,
+                            size: mq.height * 0.01,
                           ),
                         ),
                       ],
@@ -157,7 +159,7 @@ Widget eventWidget({required EventTypeItem type, required Size size}) {
         type.type,
         style: headingStyle(
           color: AppColors.primary,
-          size: size.height * 0.6,
+          size: size.height * 0.45,
         ),
       ),
     ),

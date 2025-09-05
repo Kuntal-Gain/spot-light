@@ -9,8 +9,13 @@ import 'package:spot_time/core/constants/app_color.dart';
 import 'package:spot_time/core/constants/app_strings.dart';
 import 'package:spot_time/core/network/logger.dart';
 import 'package:spot_time/core/utils/size_box.dart';
+import 'package:spot_time/core/utils/snackbar.dart';
 import 'package:spot_time/core/utils/time_formatter.dart';
 import 'package:spot_time/core/widgets/loading_indicators.dart';
+import 'package:spot_time/feature/event/app/cubit/poll/poll_cubit.dart';
+import 'package:spot_time/feature/event/app/cubit/poll/poll_state.dart';
+import 'package:spot_time/feature/event/app/screens/poll_screen.dart';
+import 'package:spot_time/feature/event/app/widgets/poll_card.dart';
 import 'package:spot_time/feature/event/data/models/user_model.dart';
 import 'package:spot_time/feature/event/domain/entities/chat_entity.dart';
 import 'package:spot_time/feature/event/domain/entities/event_entity.dart';
@@ -18,6 +23,7 @@ import 'package:spot_time/feature/event/domain/entities/user_entity.dart';
 
 import '../../../../core/utils/text_style.dart';
 import '../cubit/chat/chat_cubit.dart';
+import 'package:spot_time/di.dart' as di;
 
 class ChatScreen extends StatefulWidget {
   final String messageID;
@@ -38,24 +44,19 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  // final DatabaseReference _messagesRef =
-  //     FirebaseDatabase.instance.ref('events');
-
   StreamSubscription<DatabaseEvent>? _messageSub;
 
   Future<UserEntity?> fetchUser(String uid) async {
-    // example: pull from Firestore/Realtime DB
     final snap = await FirebaseFirestore.instance
         .collection(AppStrings.userCollection)
         .doc(uid)
         .get();
     if (!snap.exists) return null;
-
     final data = snap.data()!;
     return UserModel.fromMap(data);
   }
 
-  void sendMessage() async {
+  void sendMessage() {
     if (_controller.text.trim().isNotEmpty) {
       final uid = widget.user.uid;
 
@@ -67,13 +68,6 @@ class _ChatScreenState extends State<ChatScreen> {
         createdAt: DateTime.now().millisecondsSinceEpoch,
       );
 
-      // await _messagesRef.child(widget.messageID).child('messages').push().set({
-      //   'senderId': newMessage.senderId,
-      //   'content': newMessage.content,
-      //   'type': newMessage.type,
-      //   'createdAt': newMessage.createdAt,
-      // });
-
       context
           .read<ChatCubit>()
           .sendMessage(message: newMessage, event: widget.event);
@@ -82,7 +76,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ✅ Group messages by date
   Map<String, List<MessageEntity>> groupMessagesByDate(
       List<MessageEntity> messages) {
     Map<String, List<MessageEntity>> grouped = {};
@@ -97,7 +90,6 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-
     printLog('info', widget.event.eventId);
     printLog('info', widget.messageID);
     context.read<ChatCubit>().fetchMessages(
@@ -112,7 +104,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-// ✅ Main body widget
   Widget _bodyWidget(List<MessageEntity> messages) {
     final groupedMessages = groupMessagesByDate(messages);
     final dateKeys = groupedMessages.keys.toList();
@@ -126,8 +117,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 🔹 Date separator
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Container(
@@ -142,99 +133,144 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-
-            // 🔹 Messages under that date
-            ...dayMessages.map((message) => _buildMessageItem(message)),
+            ...dayMessages.map(
+              (message) => ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: _buildMessageItem(message),
+              ),
+            ),
           ],
         );
       },
     );
   }
 
-// ✅ Extracted message item (your old code refactored)
   Widget _buildMessageItem(MessageEntity message) {
     final isMe = message.senderId == widget.user.uid;
 
     if (message.senderId.toLowerCase() == 'server') {
       return Align(
         alignment: Alignment.center,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.7,
-          ),
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(color: Colors.grey.shade300),
-            child: Text(
-              message.content,
-              softWrap: true,
-              maxLines: null,
-              style: const TextStyle(color: Colors.black87, fontSize: 15),
-            ),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: Colors.grey.shade300),
+          child: Text(
+            message.content,
+            softWrap: true,
+            maxLines: null,
+            style: const TextStyle(color: Colors.black87, fontSize: 15),
           ),
         ),
       );
-    } else {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 12),
-        child: Align(
-          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-          child: Row(
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-            children: [
-              if (!isMe)
-                FutureBuilder(
-                  future: fetchUser(message.senderId),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.done) {
-                      final user = snapshot.data;
-                      return Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: AppColors.secondary, width: 1.8),
-                        ),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: AppColors.secondary,
-                          backgroundImage: (user!.avatar.isNotEmpty)
-                              ? NetworkImage(user.avatar)
-                              : null,
-                          child: (user.avatar.isEmpty)
-                              ? Text(
-                                  (user.name.isNotEmpty)
-                                      ? user.name[0].toUpperCase()
-                                      : "?",
-                                  style: headingStyle(
-                                      color: AppColors.primary, size: 22),
-                                )
-                              : null,
-                        ),
-                      );
-                    } else if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const CupertinoActivityIndicator();
-                    } else {
-                      return sizeZ();
-                    }
-                  },
-                ),
+    }
 
-              // 🔹 Message bubble
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isMe ? AppColors.primary : AppColors.secondary,
-                  border: Border.all(color: AppColors.secondary, width: 1.8),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 12),
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isMe)
+              FutureBuilder(
+                future: fetchUser(message.senderId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      snapshot.data != null) {
+                    final user = snapshot.data!;
+                    return Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: AppColors.secondary, width: 1.8),
+                      ),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: AppColors.secondary,
+                        backgroundImage: user.avatar.isNotEmpty
+                            ? NetworkImage(user.avatar)
+                            : null,
+                        child: user.avatar.isEmpty
+                            ? Text(
+                                user.name.isNotEmpty
+                                    ? user.name[0].toUpperCase()
+                                    : "?",
+                                style: headingStyle(
+                                    color: AppColors.primary, size: 22),
+                              )
+                            : null,
+                      ),
+                    );
+                  } else if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const CupertinoActivityIndicator();
+                  } else {
+                    return sizeZ();
+                  }
+                },
+              ),
+
+            // 🔹 Message bubble
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isMe ? AppColors.primary : AppColors.secondary,
+                border: Border.all(color: AppColors.secondary, width: 1.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (message.type == "poll" && message.pollId != null)
+                    BlocProvider(
+                      create: (_) =>
+                          di.sl<PollCubit>()..getSinglePoll(message.pollId!),
+                      child: BlocConsumer<PollCubit, PollState>(
+                        listener: (context, state) {
+                          if (state is PollError) {
+                            errorBar(context, state.error);
+                          }
+
+                          if (state is PollActionSuccess) {
+                            context
+                                .read<PollCubit>()
+                                .getSinglePoll(message.pollId!);
+                            successBar(
+                                context, "Your vote has been recorded ✅");
+                          }
+                        },
+                        builder: (context, state) {
+                          printLog('warn', state.toString());
+
+                          if (state is PollLoading) {
+                            return const Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: CupertinoActivityIndicator(),
+                            );
+                          }
+
+                          if (state is PollLoaded || state is PollUpdated) {
+                            final poll = (state is PollLoaded)
+                                ? state.poll
+                                : (state as PollUpdated).poll;
+                            return pollCard(
+                              poll: poll,
+                              user: widget.user,
+                              context: context,
+                            );
+                          }
+
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    )
+                  else
                     Text(
                       message.content,
                       softWrap: true,
@@ -244,60 +280,56 @@ class _ChatScreenState extends State<ChatScreen> {
                         size: 15,
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Icon(
-                          Icons.access_time_outlined,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(
+                        Icons.access_time_outlined,
+                        color: isMe ? AppColors.secondary : AppColors.primary,
+                        size: 18,
+                      ),
+                      sizeHor(5),
+                      Text(
+                        getTime(message.createdAt),
+                        style: bodyStyle(
                           color: isMe ? AppColors.secondary : AppColors.primary,
-                          size: 18,
+                          size: 9,
                         ),
-                        sizeHor(5),
-                        Text(
-                          getTime(message.createdAt),
-                          softWrap: true,
-                          maxLines: null,
-                          style: bodyStyle(
-                            color:
-                                isMe ? AppColors.secondary : AppColors.primary,
-                            size: 9,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            if (isMe)
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.secondary, width: 1.8),
+                ),
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppColors.primary,
+                  backgroundImage: widget.user.avatar.isNotEmpty
+                      ? NetworkImage(widget.user.avatar)
+                      : null,
+                  child: widget.user.avatar.isEmpty
+                      ? Text(
+                          widget.user.name.isNotEmpty
+                              ? widget.user.name[0].toUpperCase()
+                              : "?",
+                          style: headingStyle(
+                              color: AppColors.secondary, size: 22),
+                        )
+                      : null,
                 ),
               ),
-
-              if (isMe)
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.secondary, width: 1.8),
-                  ),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppColors.primary,
-                    backgroundImage: (widget.user.avatar.isNotEmpty)
-                        ? NetworkImage(widget.user.avatar)
-                        : null,
-                    child: (widget.user.avatar.isEmpty)
-                        ? Text(
-                            (widget.user.name.isNotEmpty)
-                                ? widget.user.name[0].toUpperCase()
-                                : "?",
-                            style: headingStyle(
-                                color: AppColors.secondary, size: 22),
-                          )
-                        : null,
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -364,7 +396,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (state.messages.isEmpty) {
                     return const Center(child: Text("No messages yet."));
                   }
-
                   return _bodyWidget(state.messages);
                 }
                 return const SizedBox();
@@ -378,7 +409,6 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // attach media
                   Transform.rotate(
                     angle: pi / 4.5,
                     child: Container(
@@ -394,9 +424,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           color: AppColors.primary),
                     ),
                   ),
-
                   sizeHor(5),
-
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
@@ -420,9 +448,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
-
                   sizeHor(5),
-
                   Transform.rotate(
                     angle: -pi / 4.5,
                     child: GestureDetector(
@@ -452,7 +478,14 @@ class _ChatScreenState extends State<ChatScreen> {
         child: FloatingActionButton(
           backgroundColor: AppColors.secondary,
           onPressed: () {
-            // TODO : poll functionality
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => AddPollScreen(
+                  event: widget.event,
+                  user: widget.user,
+                ),
+              ),
+            );
           },
           child: const Icon(Icons.poll, color: AppColors.primary),
         ),

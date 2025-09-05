@@ -186,4 +186,14 @@ class FirebaseRepositoryImpl implements FirebaseRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, PollEntity>> getSinglePoll(String pollId) async {
+    try {
+      final poll = await remoteDataSource.getSinglePoll(pollId);
+      return Right(poll);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }

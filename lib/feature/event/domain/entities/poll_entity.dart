@@ -21,7 +21,7 @@ class PollEntity {
 class PollOptionEntity {
   final String id;
   final String text;
-  final List<String> votes; // store userIds who voted
+  final Map<String, dynamic> votes; // ✅ uid -> true
 
   PollOptionEntity({
     required this.id,

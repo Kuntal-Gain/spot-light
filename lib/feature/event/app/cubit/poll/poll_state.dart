@@ -11,11 +11,19 @@ class PollInitial extends PollState {}
 class PollLoading extends PollState {}
 
 class PollLoaded extends PollState {
-  final List<PollEntity> polls;
-  PollLoaded(this.polls);
+  final PollEntity poll;
+  PollLoaded(this.poll);
 
   @override
-  List<Object?> get props => [polls];
+  List<Object?> get props => [poll];
+}
+
+class PollUpdated extends PollState {
+  final PollEntity poll;
+  PollUpdated(this.poll);
+
+  @override
+  List<Object?> get props => [poll];
 }
 
 class PollError extends PollState {

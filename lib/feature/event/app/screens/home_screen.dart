@@ -45,7 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            Center(
+            Padding(
+              padding: const EdgeInsets.all(10),
               child: Text(
                 'Upcoming Events',
                 style: headingStyle(

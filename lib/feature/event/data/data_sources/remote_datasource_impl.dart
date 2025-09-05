@@ -9,6 +9,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/logger.dart';
 import '../../../../core/utils/generators.dart';
 import '../models/message_model.dart';
+import '../models/poll_model.dart';
 import '../models/user_model.dart';
 import 'remote_datasource.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -258,6 +259,7 @@ class RemoteDataSourceImpl implements RemoteDataSource {
         content: message.content,
         type: message.type,
         createdAt: message.createdAt,
+        pollId: message.pollId,
       ).toMap();
 
       printLog("info", "Prepared msgData: $msgData");
@@ -316,6 +318,7 @@ class RemoteDataSourceImpl implements RemoteDataSource {
               type: msgMap['type'] ?? "text",
               createdAt:
                   msgMap['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+              pollId: msgMap['pollId'] ?? "",
             );
             messages.add(message);
             printLog("info", "Message parsed: ${message.toMap()}");
@@ -351,13 +354,143 @@ class RemoteDataSourceImpl implements RemoteDataSource {
 
   @override
   Future<void> createPoll(PollEntity poll) {
-    // TODO: implement createPoll
-    throw UnimplementedError();
+    try {
+      final pollRef = db.ref().child('polls').child(poll.id);
+      final newPoll = PollModel(
+        id: poll.id,
+        eventId: poll.eventId,
+        question: poll.question,
+        options: poll.options,
+        createdBy: poll.createdBy,
+        createdAt: poll.createdAt,
+        expiresAt: poll.expiresAt,
+      ).toMap();
+
+      return pollRef.set(newPoll).then((_) {
+        printLog("info", "Poll created successfully");
+      });
+    } catch (e) {
+      printLog("err", e.toString());
+      throw ServerFailure(e.toString());
+    }
   }
 
   @override
-  Future<void> votePoll({required String pollId, required String optionId}) {
-    // TODO: implement votePoll
-    throw UnimplementedError();
+  Future<void> votePoll({
+    required String pollId,
+    required String optionId,
+  }) async {
+    final db = FirebaseDatabase.instance.ref();
+
+    try {
+      final uid = await getCurrentUid(); // ✅ fetch user inside
+      printLog("info", "🔎 [DEBUG] Current UID => $uid");
+
+      final pollRef = db.child("polls/$pollId/options");
+      final snapshot = await pollRef.get();
+
+      if (!snapshot.exists) {
+        printLog("err", "⚠️ [DEBUG] Poll $pollId has no options");
+        return;
+      }
+
+      final rawData = snapshot.value;
+      printLog("info",
+          "🔎 [DEBUG] snapshot.value.runtimeType => ${rawData.runtimeType}");
+      printLog("info", "🔎 [DEBUG] snapshot.value => $rawData");
+
+      // Case 1: options are stored as a Map ( { "op-1": {...}, "op-2": {...} } )
+      if (rawData is Map) {
+        printLog("info", "✅ [DEBUG] Detected Map structure for options");
+
+        final options = Map<String, dynamic>.from(rawData);
+        printLog("info", "🔎 [DEBUG] Parsed options => $options");
+
+        // rebuild votes for each option
+        options.updateAll((key, value) {
+          final optMap = Map<String, dynamic>.from(value);
+          final votes = Map<String, dynamic>.from(optMap['votes'] ?? {});
+          printLog("info", "🔎 [DEBUG] Processing option $key => $optMap");
+          printLog("info", "🔎 [DEBUG] Before votes => $votes");
+
+          votes.remove(uid); // remove old vote
+          if (optMap['id'] == optionId) {
+            votes[uid] = true; // add new vote
+          }
+
+          printLog("info", "🔎 [DEBUG] After votes => $votes");
+
+          return {
+            ...optMap,
+            'votes': votes,
+          };
+        });
+
+        printLog("info", "✅ [DEBUG] Final updated options (Map) => $options");
+        await pollRef.set(options);
+      }
+
+      // Case 2: options are stored as a List ([{id: op-1, ...}, {id: op-2, ...}])
+      else if (rawData is List) {
+        printLog("info", "✅ [DEBUG] Detected List structure for options");
+
+        final options =
+            rawData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        printLog("info", "🔎 [DEBUG] Parsed options (List) => $options");
+
+        final updatedOptions = options.map((optMap) {
+          final votes = Map<String, dynamic>.from(optMap['votes'] ?? {});
+          printLog("info",
+              "🔎 [DEBUG] Processing option ${optMap['id']} => $optMap");
+          printLog("info", "🔎 [DEBUG] Before votes => $votes");
+
+          votes.remove(uid);
+          if (optMap['id'] == optionId) {
+            votes[uid] = true;
+          }
+
+          printLog("info", "🔎 [DEBUG] After votes => $votes");
+
+          return {
+            ...optMap,
+            'votes': votes,
+          };
+        }).toList(); // ✅ force conversion from MappedListIterable to List
+
+        printLog("info",
+            "✅ [DEBUG] Final updated options (List) => $updatedOptions");
+        await pollRef.set(updatedOptions);
+      } else {
+        throw Exception(
+            "Unknown options structure in DB: ${rawData.runtimeType}");
+      }
+    } catch (e, st) {
+      printLog("err", "❌ [DEBUG] Exception during votePoll: $e");
+      printLog("err", "❌ [DEBUG] Stacktrace:\n$st");
+      throw Exception("Failed to vote: $e");
+    }
+  }
+
+  @override
+  Future<PollEntity> getSinglePoll(String pollId) async {
+    try {
+      final snapshot = await db.ref().child("polls").child(pollId).get();
+
+      if (!snapshot.exists) {
+        throw Exception("Poll with id $pollId not found");
+      }
+
+      printLog("err",
+          "🔎 [DEBUG] Raw snapshot.value for poll $pollId => ${snapshot.value.runtimeType}");
+      printLog("err", "🔎 [DEBUG] snapshot.value content => ${snapshot.value}");
+
+      // Convert snapshot.value (Map) -> PollModel -> PollEntity
+      final pollModel = PollModel.fromSnapshot(snapshot);
+      return pollModel;
+    } catch (e, st) {
+      printLog("err", "❌ [ERROR] getSinglePoll failed: $e");
+      print("📌 [STACK] $st");
+      throw Exception("Failed to fetch poll: $e");
+    }
   }
 }
